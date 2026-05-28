@@ -1,0 +1,2196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador PIR - Versión Definitiva</title>
+    <style>
+        :root {
+            --bg-color: #f4f4f9;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --error: #ef4444;
+            --border: #e5e7eb;
+        }
+
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .contenedor { background-color: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 600px; width: 100%; }
+        #pantalla-config { text-align: center; }
+        
+        select { width: 100%; padding: 12px; margin: 10px 0 20px 0; border-radius: 6px; border: 1px solid var(--border); font-size: 1em; }
+        select[multiple] { height: auto; min-height: 120px; }
+        input[type="text"], textarea { width: 100%; padding: 12px; margin: 8px 0 16px 0; border-radius: 6px; border: 1px solid var(--border); font-size: 1em; box-sizing: border-box; font-family: inherit; }
+
+        .etiqueta-filtro { display: block; text-align: left; font-weight: bold; font-size: 0.9em; color: var(--text-muted); margin-top: 15px; }
+
+        .btn-principal { background-color: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 1em; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        .btn-principal:hover { background-color: var(--primary-hover); }
+        .btn-secundario { background-color: transparent; color: var(--error); border: 1px solid var(--error); padding: 10px 20px; border-radius: 6px; font-size: 0.9em; cursor: pointer; width: 100%; margin-top: 15px; }
+        .btn-secundario:hover { background-color: #fef2f2; }
+
+        #pantalla-test { display: none; }
+        .cabecera { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 0.9em; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .pregunta-texto { font-size: 1.2em; font-weight: 600; margin-bottom: 25px; line-height: 1.5; }
+        .opciones { display: flex; flex-direction: column; gap: 12px; }
+        .btn-opcion { background-color: var(--bg-color); border: 1px solid var(--border); padding: 15px; border-radius: 8px; text-align: left; font-size: 1em; cursor: pointer; transition: all 0.2s ease; }
+        .btn-opcion:hover:not(:disabled) { background-color: #e2e8f0; }
+        .btn-opcion:disabled { cursor: not-allowed; }
+        .btn-opcion.correcta { background-color: #d1fae5; border-color: var(--success); color: #065f46; font-weight:bold; }
+        .btn-opcion.incorrecta { background-color: #fee2e2; border-color: var(--error); color: #991b1b; }
+
+        .feedback-area { margin-top: 25px; padding: 20px; border-radius: 8px; background-color: #f8fafc; border: 1px solid var(--border); display: none; }
+        .feedback-area.visible { display: block; }
+        #btn-siguiente { margin-top: 20px; display: none; }
+
+        /* === TABS CONFIG === */
+        .tabs-config { display: flex; flex-wrap: wrap; gap: 4px; background: var(--bg-color); border-radius: 8px; padding: 4px; margin-bottom: 20px; }
+        .tab-btn { flex: 1; padding: 8px 6px; border: none; background: transparent; border-radius: 6px; font-size: 0.82em; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s; white-space: nowrap; }
+        .tab-btn.activo { background: var(--card-bg); color: var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .tab-panel { display: none; text-align: left; }
+        .tab-panel.activo { display: block; }
+
+        /* === BARRA DE PROGRESO === */
+        .barra-progreso-contenedor { margin-bottom: 18px; }
+        .barra-progreso-pista { width: 100%; height: 8px; background-color: var(--border); border-radius: 4px; overflow: hidden; }
+        .barra-progreso-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #60a5fa); border-radius: 4px; transition: width 0.4s ease; }
+        .barra-progreso-mini-stats { display: flex; gap: 14px; margin-top: 5px; font-size: 0.78em; }
+        .mini-stat-ok { color: var(--success); font-weight: 600; }
+        .mini-stat-ko { color: var(--error); font-weight: 600; }
+
+        /* === PANTALLA RESULTADOS === */
+        #pantalla-resultados { display: none; }
+        .resultado-header { text-align: center; margin-bottom: 24px; }
+        .resultado-circulo { width: 110px; height: 110px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-weight: 800; }
+        .resultado-circulo.excelente { background: #d1fae5; border: 4px solid var(--success); color: #065f46; }
+        .resultado-circulo.bien { background: #dbeafe; border: 4px solid var(--primary); color: #1e3a8a; }
+        .resultado-circulo.mejorar { background: #fef3c7; border: 4px solid #f59e0b; color: #92400e; }
+        .resultado-circulo.mal { background: #fee2e2; border: 4px solid var(--error); color: #991b1b; }
+        .resultado-circulo .pct { font-size: 1.8em; line-height: 1; }
+        .resultado-circulo .lbl { font-size: 0.68em; font-weight: 600; margin-top: 2px; }
+
+        .resultado-totales { display: flex; justify-content: center; gap: 24px; margin-bottom: 24px; font-size: 0.95em; }
+        .total-item { text-align: center; }
+        .total-num { font-size: 1.5em; font-weight: 800; }
+        .total-ok .total-num { color: var(--success); }
+        .total-ko .total-num { color: var(--error); }
+        .total-lbl { font-size: 0.75em; color: var(--text-muted); }
+
+        .resultado-seccion { margin-bottom: 20px; }
+        .resultado-seccion h3 { font-size: 0.9em; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+        .fila-asignatura { margin-bottom: 12px; }
+        .fila-asignatura-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.88em; margin-bottom: 4px; }
+        .asig-nombre { font-weight: 600; }
+        .asig-pct { font-weight: 700; font-size: 0.9em; }
+        .asig-detalle { font-size: 0.78em; color: var(--text-muted); }
+        .mini-barra-pista { width: 100%; height: 6px; background-color: var(--border); border-radius: 3px; overflow: hidden; }
+        .mini-barra-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+        .fill-excelente { background-color: var(--success); }
+        .fill-bien { background-color: var(--primary); }
+        .fill-mejorar { background-color: #f59e0b; }
+        .fill-mal { background-color: var(--error); }
+
+        .btn-desplegar-temas { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 0.78em; padding: 2px 0; text-decoration: underline; }
+        .tabla-temas { display: none; margin-top: 6px; background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .tabla-temas.visible { display: block; }
+        .fila-tema { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; font-size: 0.8em; border-bottom: 1px solid var(--border); }
+        .fila-tema:last-child { border-bottom: none; }
+        .tema-nombre { color: var(--text-main); flex: 1; padding-right: 10px; }
+        .tema-stats { display: flex; gap: 10px; white-space: nowrap; }
+        .tag-ok { color: var(--success); font-weight: 600; }
+        .tag-ko { color: var(--error); font-weight: 600; }
+
+        /* === PANEL FALLOS === */
+        .panel-fallos-config { margin-top: 20px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 14px 16px; }
+        .panel-fallos-config h3 { margin: 0 0 10px 0; font-size: 0.9em; color: #c2410c; font-weight: 700; }
+        .fila-fallo-asig { display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; margin-bottom: 6px; }
+        .btn-ver-temas-fallo { background: none; border: none; color: #c2410c; cursor: pointer; font-size: 0.75em; text-decoration: underline; padding: 0; }
+        .tabla-temas-fallo { display: none; margin-top: 4px; margin-bottom: 6px; }
+        .tabla-temas-fallo.visible { display: block; }
+        .fila-tema-fallo { font-size: 0.78em; color: var(--text-muted); padding: 3px 10px; display: flex; justify-content: space-between; }
+        .badge-fallo { background: #fee2e2; color: var(--error); font-weight: 700; font-size: 0.8em; padding: 1px 7px; border-radius: 10px; }
+
+        /* === MODO EXAMEN === */
+        .examen-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .temporizador { font-size: 1.1em; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; background: #eff6ff; padding: 4px 12px; border-radius: 20px; border: 1px solid #bfdbfe; }
+        .temporizador.urgente { color: var(--error); background: #fef2f2; border-color: #fecaca; animation: pulso 1s infinite; }
+        @keyframes pulso { 0%,100%{opacity:1} 50%{opacity:0.6} }
+        .penalizacion-info { font-size: 0.78em; color: var(--text-muted); background: #fef9c3; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 12px; margin-bottom: 12px; text-align: center; }
+        .btn-dejar-blanco { background: transparent; border: 1px dashed var(--text-muted); color: var(--text-muted); padding: 10px; border-radius: 8px; font-size: 0.88em; cursor: pointer; width: 100%; margin-top: 10px; }
+        .btn-dejar-blanco:hover { background: #f1f5f9; }
+
+        /* === MARCADOR === */
+        .btn-marcar { background: none; border: none; font-size: 1.1em; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: transform 0.1s; line-height: 1; }
+        .btn-marcar:hover { transform: scale(1.2); }
+        .btn-marcar.marcado { color: #f59e0b; }
+        .btn-marcar.no-marcado { color: #d1d5db; }
+
+        /* === MODO CIEGAS === */
+        .badge-modo { font-size: 0.72em; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+        .badge-ciegas { background: #f3e8ff; color: #7c3aed; border: 1px solid #e9d5ff; }
+        .badge-examen { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+
+        /* === HISTORIAL === */
+        .sesion-item { background: var(--bg-color); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 0.88em; }
+        .sesion-fecha { color: var(--text-muted); font-size: 0.78em; }
+        .sesion-nota { font-weight: 800; font-size: 1.1em; }
+        .sesion-detalle { font-size: 0.78em; color: var(--text-muted); }
+        .no-historial { text-align:center; color: var(--text-muted); font-size: 0.9em; padding: 20px; }
+
+        /* === BUSCADOR === */
+        .buscador-wrap { position: relative; margin-bottom: 16px; }
+        .buscador-wrap input { width: 100%; padding: 10px 14px 10px 36px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.95em; box-sizing: border-box; }
+        .buscador-icono { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1em; pointer-events: none; }
+        .buscador-resultados { max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; margin-top: -8px; }
+        .buscador-item { padding: 10px 14px; font-size: 0.82em; border-bottom: 1px solid var(--border); cursor: pointer; line-height: 1.4; text-align: left; }
+        .buscador-item:last-child { border-bottom: none; }
+        .buscador-item:hover { background: #eff6ff; cursor:pointer; }
+        body.dark .buscador-item:hover { background: #1e2a3a; }
+        .buscador-item .bi-asig { color: var(--primary); font-weight: 600; font-size: 0.85em; }
+        .buscador-item .bi-tema { color: var(--text-muted); font-size: 0.82em; }
+        .buscador-resaltado { background: #fef08a; border-radius: 2px; }
+        .buscador-vacio { text-align:center; color:var(--text-muted); padding:16px; font-size:0.88em; }
+
+        /* === MODO ANKI (AÑADIR) === */
+        .form-grupo { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 15px; text-align: left;}
+        .form-grupo h4 { margin: 0 0 10px 0; color: var(--primary); }
+
+        .resultado-score-pir { text-align: center; margin: 12px 0; padding: 10px; background: #f8fafc; border-radius: 8px; border: 1px solid var(--border); }
+        .resultado-score-pir .score-num { font-size: 1.4em; font-weight: 800; color: var(--primary); }
+        .resultado-score-pir .score-lbl { font-size: 0.78em; color: var(--text-muted); }
+        .btn-export { background: transparent; color: var(--primary); border: 1px solid var(--primary); padding: 10px 20px; border-radius: 6px; font-size: 0.9em; cursor: pointer; width: 100%; margin-top: 10px; font-weight: 600; }
+        .btn-export:hover { background: #eff6ff; }
+
+        /* === RACHA === */
+        .racha-banner { display:none; text-align:center; font-size:0.9em; font-weight:700; color:#d97706; background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:7px 12px; margin-bottom:10px; animation: aparecer 0.4s ease; }
+        @keyframes aparecer { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+
+        /* === STATS GLOBALES === */
+        .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+        .stat-card { background:var(--bg-color); border-radius:8px; padding:12px 14px; text-align:center; }
+        .stat-card .sc-num { font-size:1.5em; font-weight:800; color:var(--primary); }
+        .stat-card .sc-lbl { font-size:0.72em; color:var(--text-muted); margin-top:2px; }
+        .stat-card.ok .sc-num { color:var(--success); }
+        .stat-card.ko .sc-num { color:var(--error); }
+        .stats-asig-tabla { margin-top:4px; }
+        .stats-asig-fila { display:flex; justify-content:space-between; align-items:center; font-size:0.82em; padding:7px 0; border-bottom:1px solid var(--border); }
+        .stats-asig-fila:last-child { border-bottom:none; }
+        .stats-asig-nombre { flex:1; font-weight:600; }
+        .stats-asig-barra-wrap { width:80px; height:5px; background:var(--border); border-radius:3px; overflow:hidden; margin:0 10px; }
+        .stats-asig-barra-fill { height:100%; border-radius:3px; }
+        .grafica-wrap { margin:16px 0 8px; }
+        .grafica-titulo { font-size:0.8em; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
+        .grafica-svg-wrap { width:100%; overflow:hidden; border-radius:6px; border:1px solid var(--border); background:#f8fafc; }
+
+        /* === GESTIÓN PREGUNTAS CUSTOM === */
+        .custom-q-item { background:var(--bg-color); border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:0.83em; display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+        .custom-q-texto { flex:1; line-height:1.4; }
+        .custom-q-meta { font-size:0.78em; color:var(--text-muted); margin-top:3px; }
+        .btn-borrar-custom { background:none; border:none; color:var(--error); cursor:pointer; font-size:1.1em; padding:2px 4px; line-height:1; flex-shrink:0; }
+        .no-custom { text-align:center; color:var(--text-muted); font-size:0.88em; padding:16px; }
+
+        /* === AVISO SALIR === */
+        .btn-salir-test { background:none; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; font-size:0.82em; cursor:pointer; width:100%; margin-top:8px; }
+        .btn-salir-test:hover { background:#f1f5f9; }
+
+        /* === INFO BANCO === */
+        .info-banco { font-size:0.75em; color:var(--text-muted); text-align:right; margin-top:-14px; margin-bottom:6px; }
+
+        /* === SELECT HIGHLIGHT === */
+        select option:checked { background-color:#dbeafe; }
+
+        /* === SELECTOR ASIGNATURAS === */
+        .asig-btns-especiales { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+        .asig-btn-esp { padding:5px 10px; border:1px solid var(--border); border-radius:20px; background:transparent; font-size:0.78em; cursor:pointer; color:var(--text-muted); font-weight:600; transition:all 0.15s; white-space:nowrap; }
+        .asig-btn-esp:hover { border-color:var(--primary); color:var(--primary); }
+        .asig-btn-esp.activo { background:var(--primary); color:white; border-color:var(--primary); }
+        .asig-btns-grid { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+        .asig-btn { padding:5px 10px; border:1px solid var(--border); border-radius:6px; background:transparent; font-size:0.8em; cursor:pointer; color:var(--text-main); font-weight:500; transition:all 0.15s; white-space:nowrap; }
+        .asig-btn:hover { border-color:var(--primary); color:var(--primary); }
+        .asig-btn.activo { background:var(--primary); color:white; border-color:var(--primary); font-weight:600; }
+        body.dark .asig-btn, body.dark .asig-btn-esp { background:transparent; }
+        body.dark .asig-btn.activo, body.dark .asig-btn-esp.activo { background:var(--primary); }
+
+
+        /* === BANCO COMPLETO === */
+        .banco-item { border:1px solid var(--border); border-radius:7px; padding:10px 12px; margin-bottom:7px; display:flex; justify-content:space-between; align-items:flex-start; gap:8px; font-size:0.82em; }
+        .banco-item-texto { flex:1; line-height:1.4; }
+        .banco-item-meta { font-size:0.76em; color:var(--text-muted); margin-top:2px; }
+        .banco-item-acciones { display:flex; gap:4px; flex-shrink:0; }
+        .btn-editar { background:none; border:1px solid var(--border); color:var(--primary); cursor:pointer; font-size:0.85em; padding:3px 8px; border-radius:5px; }
+        .btn-editar:hover { background:#eff6ff; }
+        .btn-borrar-banco { background:none; border:1px solid var(--border); color:var(--error); cursor:pointer; font-size:0.85em; padding:3px 8px; border-radius:5px; }
+        .btn-borrar-banco:hover { background:#fef2f2; }
+        .banco-custom-badge { background:#d1fae5; color:#065f46; font-size:0.7em; font-weight:700; padding:1px 5px; border-radius:8px; margin-left:4px; vertical-align:middle; }
+        .banco-paginacion { display:flex; justify-content:center; gap:8px; margin-top:12px; align-items:center; font-size:0.85em; }
+        .pag-btn { background:none; border:1px solid var(--border); border-radius:5px; padding:4px 10px; cursor:pointer; color:var(--text-main); }
+        .pag-btn:hover { background:var(--bg-color); }
+        .pag-btn:disabled { opacity:0.4; cursor:default; }
+
+
+        /* === MODO OSCURO === */
+        body.dark { --bg-color:#1a1a2e; --card-bg:#16213e; --text-main:#e2e8f0; --text-muted:#94a3b8; --primary:#60a5fa; --primary-hover:#3b82f6; --success:#34d399; --error:#f87171; --border:#2d3748; }
+        body.dark .btn-opcion { background-color:#1e2a3a; }
+        body.dark .btn-opcion:hover:not(:disabled) { background-color:#263548; }
+        body.dark .feedback-area { background:#1e2a3a; }
+        body.dark .tabs-config { background:#0f172a; }
+        body.dark .tab-btn.activo { background:#1e2a3a; }
+        body.dark .sesion-item, body.dark .stat-card { background:#1e2a3a; }
+        body.dark .grafica-svg-wrap { background:#1e2a3a; }
+        body.dark select, body.dark input[type="text"], body.dark textarea { background:#1e2a3a; color:var(--text-main); border-color:var(--border); }
+        body.dark .buscador-item:hover { background:#1e2a3a; }
+        body.dark .panel-fallos-config { background:#2d1b0e; border-color:#92400e; }
+        body.dark .custom-q-item { background:#1e2a3a; }
+        body.dark .tabla-temas { background:#1e2a3a; }
+        body.dark .resultado-score-pir { background:#1e2a3a; }
+        body.dark .penalizacion-info { background:#2d2a0e; border-color:#854d0e; }
+        body.dark .btn-opcion.correcta { background:#064e3b; border-color:#34d399; color:#a7f3d0; }
+        body.dark .btn-opcion.incorrecta { background:#450a0a; border-color:#f87171; color:#fecaca; }
+
+        /* === TOGGLE OSCURO === */
+        .dark-toggle { position:fixed; top:14px; right:14px; background:var(--card-bg); border:1px solid var(--border); border-radius:20px; padding:5px 10px; font-size:0.8em; cursor:pointer; z-index:100; color:var(--text-muted); transition:all 0.2s; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+        .dark-toggle:hover { color:var(--text-main); }
+
+        /* === TOAST === */
+        .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:#1e293b; color:#f1f5f9; padding:10px 20px; border-radius:8px; font-size:0.88em; font-weight:600; z-index:999; transition:transform 0.3s ease, opacity 0.3s ease; opacity:0; pointer-events:none; white-space:nowrap; }
+        .toast.visible { transform:translateX(-50%) translateY(0); opacity:1; }
+        .toast.ok { border-left:3px solid #34d399; }
+        .toast.error { border-left:3px solid #f87171; }
+
+        /* === TRANSICIÓN PREGUNTA === */
+        @keyframes fadeSlide { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .pregunta-texto, .opciones { animation: fadeSlide 0.25s ease; }
+
+        /* === TECLAS HINT === */
+        .teclas-hint { font-size:0.7em; color:var(--text-muted); text-align:center; margin-top:6px; letter-spacing:0.03em; }
+
+        /* === ZONA DATOS === */
+        .zona-datos-toggle { background:none; border:1px dashed var(--border); color:var(--text-muted); border-radius:6px; padding:7px 14px; font-size:0.8em; cursor:pointer; width:100%; margin-top:16px; }
+        .zona-datos-toggle:hover { background:#fef2f2; color:var(--error); border-color:var(--error); }
+        .zona-datos-panel { display:none; margin-top:8px; padding:12px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; }
+        .zona-datos-panel.visible { display:block; }
+
+        /* === PANTALLA REVISIÓN === */
+        #pantalla-revision { display:none; }
+        .revision-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+        .revision-filtros { display:flex; gap:8px; margin-bottom:16px; }
+        .rev-btn-filtro { flex:1; padding:7px; border:1px solid var(--border); border-radius:6px; background:transparent; font-size:0.82em; cursor:pointer; color:var(--text-muted); font-weight:600; }
+        .rev-btn-filtro.activo { background:var(--primary); color:white; border-color:var(--primary); }
+        .revision-item { border:1px solid var(--border); border-radius:8px; margin-bottom:14px; overflow:hidden; }
+        .revision-item-header { padding:10px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; }
+        .revision-item-header:hover { background:var(--bg-color); }
+        .revision-item-body { padding:12px 14px; border-top:1px solid var(--border); display:none; }
+        .revision-item-body.visible { display:block; }
+        .revision-item.ok .revision-item-header { background:#f0fdf4; }
+        .revision-item.ko .revision-item-header { background:#fef2f2; }
+        .revision-item.bl .revision-item-header { background:#f8fafc; }
+        body.dark .revision-item.ok .revision-item-header { background:#052e16; }
+        body.dark .revision-item.ko .revision-item-header { background:#450a0a; }
+        body.dark .revision-item-header:hover { background:var(--bg-color); }
+        body.dark .revision-item-body { background:#1a1a2e; }
+        .rev-pregunta-num { font-size:0.75em; color:var(--text-muted); font-weight:700; }
+        .rev-icono { font-size:1.1em; }
+        .rev-pregunta-texto { font-size:0.88em; font-weight:600; flex:1; margin:0 10px; line-height:1.4; }
+        .rev-opciones { margin:8px 0; display:flex; flex-direction:column; gap:6px; }
+        .rev-opcion { padding:8px 12px; border-radius:6px; font-size:0.83em; border:1px solid var(--border); }
+        .rev-opcion.correcta { background:#d1fae5; border-color:var(--success); color:#065f46; font-weight:600; }
+        .rev-opcion.incorrecta { background:#fee2e2; border-color:var(--error); color:#991b1b; }
+        .rev-opcion.blanco { background:#f1f5f9; border-color:var(--border); color:var(--text-muted); font-style:italic; }
+        body.dark .rev-opcion.correcta { background:#064e3b; color:#a7f3d0; }
+        body.dark .rev-opcion.ko { background:#450a0a; color:#fecaca; }
+        .rev-explicacion { font-size:0.82em; color:var(--text-muted); margin-top:8px; padding:8px 12px; background:var(--bg-color); border-radius:6px; line-height:1.5; }
+        .rev-meta { font-size:0.75em; color:var(--text-muted); margin-bottom:6px; }
+    </style>
+</head>
+<body>
+
+    <button class="dark-toggle" id="dark-toggle" onclick="toggleDark()" title="Modo oscuro">🌙</button>
+    <div id="toast" class="toast"></div>
+    <div class="contenedor">
+        <div id="pantalla-config">
+            <h2 style="margin-bottom:16px; margin-top:0;">Preparación PIR</h2>
+
+            <div class="tabs-config">
+                <button class="tab-btn activo" onclick="cambiarTab('tab-repaso', this)">📚 Repaso</button>
+                <button class="tab-btn" onclick="cambiarTab('tab-examen', this)">🎓 Examen</button>
+                <button class="tab-btn" onclick="cambiarTab('tab-historial', this)">📊 Stats</button>
+                <button class="tab-btn" onclick="cambiarTab('tab-buscar', this)">🔍 Buscar</button>
+                <button class="tab-btn" onclick="cambiarTab('tab-añadir', this)">➕ Añadir</button>
+            </div>
+
+            <!-- TAB REPASO -->
+            <div class="tab-panel activo" id="tab-repaso">
+                <span class="etiqueta-filtro">1. Selecciona la materia <span style="font-weight:normal;font-size:0.85em">(Ctrl/Cmd para varias)</span></span>
+                <!-- Modos especiales -->
+                <div class="asig-btns-especiales">
+                    <button class="asig-btn-esp" data-val="Todas" onclick="seleccionarEspecial('Todas')" id="esp-Todas">Todas</button>
+                    <button class="asig-btn-esp" data-val="NoHechas" onclick="seleccionarEspecial('NoHechas')" id="esp-NoHechas">🆕 No hechas</button>
+                    <button class="asig-btn-esp" data-val="Fallos" onclick="seleccionarEspecial('Fallos')" id="esp-Fallos">⚠️ Fallos</button>
+                    <button class="asig-btn-esp" data-val="Marcadas" onclick="seleccionarEspecial('Marcadas')" id="esp-Marcadas">📌 Marcadas</button>
+                    <button class="asig-btn-esp" data-val="Spaced" onclick="seleccionarEspecial('Spaced')" id="esp-Spaced">🧠 Espaciada</button>
+                </div>
+                <!-- Asignaturas -->
+                <div class="asig-btns-grid" id="asig-btns-grid">
+                    <button class="asig-btn" data-val="Psicología Clínica" onclick="toggleAsig(this)">Clínica</button>
+                    <button class="asig-btn" data-val="Tratamientos Adultos" onclick="toggleAsig(this)">Ttos. Adultos</button>
+                    <button class="asig-btn" data-val="Tratamientos Infantiles" onclick="toggleAsig(this)">Ttos. Infantil</button>
+                    <button class="asig-btn" data-val="Psicobiología" onclick="toggleAsig(this)">Psicobiología</button>
+                    <button class="asig-btn" data-val="Psicología Experimental" onclick="toggleAsig(this)">Experimental</button>
+                    <button class="asig-btn" data-val="Evaluación Psicológica" onclick="toggleAsig(this)">Evaluación</button>
+                    <button class="asig-btn" data-val="Psicología de la Personalidad y Diferencial" onclick="toggleAsig(this)">Personalidad</button>
+                    <button class="asig-btn" data-val="Psicología Evolutiva" onclick="toggleAsig(this)">Evolutiva</button>
+                    <button class="asig-btn" data-val="Psicología Social" onclick="toggleAsig(this)">Social</button>
+                    <button class="asig-btn" data-val="Psicología Básica" onclick="toggleAsig(this)">Básica</button>
+                    <button class="asig-btn" data-val="Psicología de la Salud" onclick="toggleAsig(this)">Salud</button>
+                </div>
+                <input type="hidden" id="filtro-asignatura" value="Todas">
+                <div class="info-banco" id="info-banco-asig"></div>
+                <div class="info-banco" id="info-banco-nohechas" style="color:#059669"></div>
+
+                <span class="etiqueta-filtro">2. Selecciona el tema <span style="font-weight:normal;font-size:0.85em">(Opcional / Ctrl para varios)</span></span>
+                <select id="filtro-tema" multiple>
+                    <option value="Todos" selected>Todos los temas disponibles</option>
+                </select>
+                <div class="info-banco" id="info-banco-tema"></div>
+
+                <span class="etiqueta-filtro">3. Número de preguntas</span>
+                <select id="filtro-cantidad">
+                    <option value="Todas">Todas las disponibles</option>
+                    <option value="10">10 preguntas</option>
+                    <option value="20">20 preguntas</option>
+                    <option value="30">30 preguntas</option>
+                    <option value="40">40 preguntas</option>
+                    <option value="50">50 preguntas</option>
+                </select>
+
+                <span class="etiqueta-filtro">4. Modo</span>
+                <select id="filtro-modo">
+                    <option value="normal">Normal (feedback inmediato)</option>
+                    <option value="ciegas">🙈 A ciegas (feedback al final)</option>
+                </select>
+
+                <button class="btn-principal" onclick="iniciarTest()">▶ Empezar Test</button>
+                <button class="zona-datos-toggle" onclick="document.getElementById('zona-datos-panel').classList.toggle('visible')">⚠️ Gestionar datos guardados ▾</button>
+                <div class="zona-datos-panel" id="zona-datos-panel">
+                    <button class="btn-secundario" onclick="borrarHistorialFallos()" style="margin-top:6px">Borrar historial de fallos</button>
+                    <button class="btn-secundario" onclick="borrarRespondidas()" style="font-size:0.82em;margin-top:8px">Marcar todas como no hechas</button>
+                    <button class="btn-secundario" onclick="borrarHistorial()" style="font-size:0.82em;margin-top:8px">Borrar historial de sesiones</button>
+                    <button class="btn-secundario" onclick="borrarStatsGlobales()" style="font-size:0.82em;margin-top:8px">Borrar estadísticas globales</button>
+                </div>
+
+                <div id="panel-fallos-config" class="panel-fallos-config" style="display:none">
+                    <h3>⚠️ Fallos acumulados por asignatura</h3>
+                    <div id="lista-fallos-asig"></div>
+                </div>
+            </div>
+
+            <!-- TAB EXAMEN -->
+            <div class="tab-panel" id="tab-examen">
+                <p style="font-size:0.9em;color:var(--text-muted);margin:0 0 16px;text-align:left">
+                    Simula el examen real PIR: penalización de <strong>-0.25</strong> por fallo, puedes dejar en blanco, y cronómetro opcional.
+                </p>
+                <span class="etiqueta-filtro">Modo de examen</span>
+                <select id="examen-cantidad" onchange="actualizarContadorExamen()">
+                    <option value="PIR" selected>🎓 Simulacro PIR real (210 preguntas · 4h 30min)</option>
+                    <option value="50">Mini-simulacro (50 preguntas)</option>
+                    <option value="100">Medio simulacro (100 preguntas)</option>
+                    <option value="10">Práctica rápida (10 preguntas)</option>
+                </select>
+                <div id="info-pir-dist" style="font-size:0.78em;color:var(--text-muted);margin:4px 0 10px;line-height:1.6;display:block"></div>
+                <span class="etiqueta-filtro" id="lbl-tiempo-examen" style="display:none">Temporizador personalizado</span>
+                <select id="examen-tiempo" style="display:none">
+                    <option value="0">Sin límite de tiempo</option>
+                    <option value="30">30 minutos</option>
+                    <option value="60">1 hora</option>
+                    <option value="90">1h 30min</option>
+                    <option value="150">2h 30min</option>
+                    <option value="270">4h 30min</option>
+                </select>
+                <div class="info-banco" id="info-banco-examen" style="margin-bottom:10px"></div>
+                <button class="btn-principal" onclick="iniciarExamen()">🎓 Iniciar Examen Simulado</button>
+            </div>
+
+            <!-- TAB HISTORIAL / STATS -->
+            <div class="tab-panel" id="tab-historial">
+                <div class="tabs-config" style="margin-bottom:14px">
+                    <button class="tab-btn activo" id="subtab-btn-historial" onclick="cambiarSubTab('subtab-historial', this)">📋 Sesiones</button>
+                    <button class="tab-btn" id="subtab-btn-stats" onclick="cambiarSubTab('subtab-stats', this)">📊 Global</button>
+                </div>
+                <div id="subtab-historial">
+                    <div id="contenido-historial"></div>
+                    <button class="btn-secundario" onclick="borrarHistorial()" style="margin-top:10px">Borrar historial de sesiones</button>
+                </div>
+                <div id="subtab-stats" style="display:none">
+                    <div id="contenido-stats-globales"></div>
+                </div>
+            </div>
+
+            <!-- TAB BUSCAR -->
+            <div class="tab-panel" id="tab-buscar">
+                <div class="buscador-wrap">
+                    <span class="buscador-icono">🔍</span>
+                    <input type="text" id="input-buscador" placeholder="Buscar por texto, asignatura o tema..." oninput="buscarPreguntas()" autocomplete="off">
+                </div>
+                <div id="resultados-busqueda"></div>
+            </div>
+
+            <!-- TAB AÑADIR -->
+            <div class="tab-panel" id="tab-añadir">
+                <div class="tabs-config" style="margin-bottom:14px">
+                    <button class="tab-btn activo" id="subtab-btn-nueva" onclick="cambiarSubTab('subtab-nueva', this)">✏️ Nueva pregunta</button>
+                    <button class="tab-btn" id="subtab-btn-mias" onclick="cambiarSubTab('subtab-mias', this)">📂 Mis preguntas</button>
+                    <button class="tab-btn" id="subtab-btn-banco" onclick="cambiarSubTab('subtab-banco', this)">🗂 Banco completo</button>
+                </div>
+
+                <div id="subtab-nueva">
+                    <div style="margin-bottom:16px;padding:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px">
+                        <div style="font-weight:600;margin-bottom:6px;color:#1e40af">📥 Importar desde JSON</div>
+                        <div style="font-size:0.82em;color:#1e40af;margin-bottom:8px">Importa preguntas desde un archivo JSON generado por el script de procesamiento</div>
+                        <input type="file" id="import-json-file" accept=".json" style="display:none" onchange="importarJSON(event)">
+                        <button class="btn-secundario" onclick="document.getElementById('import-json-file').click()" style="font-size:0.85em">📁 Seleccionar archivo JSON</button>
+                    </div>
+                    <p style="font-size:0.9em;color:var(--text-muted);margin:0 0 14px">Añade tus propias preguntas. Se guardarán en tu navegador.</p>
+
+                    <span class="etiqueta-filtro" style="margin-top:0">Asignatura</span>
+                    <select id="anki-asig-sel" onchange="sincronizarAsigAnki()" style="margin-bottom:6px">
+                        <option value="">— Selecciona o escribe abajo —</option>
+                    </select>
+                    <input type="text" id="anki-asig" placeholder="O escribe una asignatura nueva..." oninput="sincronizarAsigAnkiDesdeInput();mostrarHintEquiv('anki-asig','hint-asig',EQUIV_ASIG)" autocomplete="off" style="margin-top:0;margin-bottom:4px">
+                    <div id="hint-asig" style="font-size:0.75em;color:#059669;margin-bottom:12px;min-height:1em"></div>
+
+                    <span class="etiqueta-filtro">Tema</span>
+                    <select id="anki-tema-sel" onchange="sincronizarTemaAnki()" style="margin-bottom:6px">
+                        <option value="">— Selecciona o escribe abajo —</option>
+                    </select>
+                    <input type="text" id="anki-tema" placeholder="O escribe un tema nuevo..." oninput="sincronizarTemaAnkiDesdeInput();mostrarHintEquiv('anki-tema','hint-tema',EQUIV_TEMA)" autocomplete="off" style="margin-top:0;margin-bottom:4px">
+                    <div id="hint-tema" style="font-size:0.75em;color:#059669;margin-bottom:12px;min-height:1em"></div>
+
+                    <span class="etiqueta-filtro">Pregunta</span>
+                    <textarea id="anki-preg" rows="3" placeholder="Escribe el enunciado de la pregunta..."></textarea>
+
+                    <span class="etiqueta-filtro">Opciones de respuesta</span>
+                    <input type="text" id="anki-op1" placeholder="Opción 1">
+                    <input type="text" id="anki-op2" placeholder="Opción 2">
+                    <input type="text" id="anki-op3" placeholder="Opción 3">
+                    <input type="text" id="anki-op4" placeholder="Opción 4">
+
+                    <span class="etiqueta-filtro">¿Cuál es la correcta?</span>
+                    <select id="anki-correcta">
+                        <option value="1">La opción 1</option>
+                        <option value="2">La opción 2</option>
+                        <option value="3">La opción 3</option>
+                        <option value="4">La opción 4</option>
+                    </select>
+
+                    <span class="etiqueta-filtro">Explicación (Opcional)</span>
+                    <textarea id="anki-exp" rows="2" placeholder="Por qué esta es la respuesta correcta..."></textarea>
+
+                    <button class="btn-principal" onclick="guardarPreguntaAnki()" style="background:#10b981">💾 Guardar Pregunta</button>
+                </div>
+
+                <div id="subtab-mias" style="display:none">
+                    <div id="lista-custom-preguntas"></div>
+                </div>
+                <div id="subtab-banco" style="display:none">
+                    <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
+                        <input type="text" id="banco-buscar" placeholder="Filtrar por texto, asignatura o tema..." oninput="filtrarBanco()" style="flex:1;margin:0">
+                        <span id="banco-count" style="font-size:0.78em;color:var(--text-muted);white-space:nowrap"></span>
+                    </div>
+                    <div id="lista-banco-completo"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANTALLA TEST -->
+        <div id="pantalla-test" style="display:none">
+            <div class="cabecera examen-header">
+                <span id="etiqueta-tema" style="font-size:0.85em;color:var(--text-muted);flex:1;margin-right:8px;font-weight:600"></span>
+                <span id="temporizador-display" class="temporizador" style="display:none">--:--</span>
+                <button class="btn-marcar no-marcado" id="btn-marcar-preg" onclick="toggleMarcar()" title="Marcar para repasar">📌</button>
+                <button class="btn-marcar no-marcado" id="btn-editar-test" onclick="abrirModalTest()" title="Editar esta pregunta" style="font-size:0.95em">✏️</button>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span id="contador-preguntas" style="font-size:0.82em;color:var(--text-muted)">Pregunta -/-</span>
+                <span id="badge-modo-test"></span>
+            </div>
+            <div id="racha-banner" class="racha-banner"></div>
+            <div class="barra-progreso-contenedor">
+                <div class="barra-progreso-pista">
+                    <div class="barra-progreso-fill" id="barra-fill" style="width:0%"></div>
+                </div>
+                <div class="barra-progreso-mini-stats">
+                    <span class="mini-stat-ok" id="mini-aciertos">✓ 0 aciertos</span>
+                    <span class="mini-stat-ko" id="mini-fallos-test">✗ 0 fallos</span>
+                    <span id="mini-blancos" style="color:var(--text-muted);font-size:0.78em;display:none">— 0 en blanco</span>
+                </div>
+            </div>
+            <div id="penalizacion-info" class="penalizacion-info" style="display:none">
+                ⚖️ Modo examen: <strong>+1</strong> acierto · <strong>-0.25</strong> fallo · <strong>0</strong> en blanco
+            </div>
+            <div class="pregunta-texto" id="texto-pregunta"></div>
+            <div class="opciones" id="contenedor-opciones"></div>
+            <button class="btn-dejar-blanco" id="btn-blanco" onclick="dejarEnBlanco()" style="display:none">— Dejar en blanco</button>
+            <div class="feedback-area" id="area-explicacion">
+                <strong>Explicación:</strong>
+                <p id="texto-explicacion"></p>
+            </div>
+            <button class="btn-principal" id="btn-siguiente" onclick="siguientePregunta()">Siguiente Pregunta</button>
+            <div class="teclas-hint" id="teclas-hint">⌨️ Teclas: <kbd>1-4</kbd> responder · <kbd>Espacio/→</kbd> siguiente · <kbd>M</kbd> marcar · <kbd>N</kbd> noche · <kbd>Esc</kbd> salir</div>
+            <button class="btn-salir-test" onclick="confirmarSalir()">↩ Salir del test</button>
+        </div>
+
+        <!-- PANTALLA REVISIÓN -->
+        <div id="pantalla-revision">
+            <div class="revision-header">
+                <h2 style="margin:0;font-size:1.1em">📋 Revisión del test</h2>
+                <button class="btn-marcar no-marcado" onclick="volverAlInicio()" style="font-size:0.85em;padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;color:var(--text-muted)">✕ Cerrar</button>
+            </div>
+            <div class="revision-filtros">
+                <button class="rev-btn-filtro activo" id="rev-f-todas" onclick="filtrarRevision('todas',this)">Todas</button>
+                <button class="rev-btn-filtro" id="rev-f-fallos" onclick="filtrarRevision('fallos',this)">Solo fallos</button>
+                <button class="rev-btn-filtro" id="rev-f-ok" onclick="filtrarRevision('ok',this)">Solo aciertos</button>
+            </div>
+            <div id="revision-lista"></div>
+            <button class="btn-principal" onclick="volverDeRevision()">← Volver a resultados</button>
+        </div>
+
+        <!-- PANTALLA RESULTADOS -->
+        <div id="pantalla-resultados" style="display:none">
+            <div class="resultado-header">
+                <div class="resultado-circulo" id="circulo-resultado">
+                    <span class="pct" id="pct-resultado">0%</span>
+                    <span class="lbl" id="lbl-resultado">-</span>
+                </div>
+                <h2 style="margin:0 0 4px 0">Resultados</h2>
+                <p style="color:var(--text-muted);font-size:0.9em;margin:0" id="lbl-subtitulo-resultado"></p>
+            </div>
+            <div class="resultado-totales">
+                <div class="total-item total-ok">
+                    <div class="total-num" id="res-aciertos">0</div>
+                    <div class="total-lbl">Aciertos</div>
+                </div>
+                <div class="total-item total-ko">
+                    <div class="total-num" id="res-fallos">0</div>
+                    <div class="total-lbl">Fallos</div>
+                </div>
+                <div class="total-item">
+                    <div class="total-num" id="res-blancos" style="display:none">0</div>
+                    <div class="total-lbl" id="lbl-blancos" style="display:none">En blanco</div>
+                    <div class="total-num" id="res-total">0</div>
+                    <div class="total-lbl">Total</div>
+                </div>
+            </div>
+            <div id="score-pir-wrap" class="resultado-score-pir" style="display:none">
+                <div class="score-num" id="score-pir-num">0.00</div>
+                <div class="score-lbl">Puntuación PIR (aciertos − fallos×0.25)</div>
+            </div>
+            <div id="racha-resultado-wrap" style="display:none;text-align:center;margin-bottom:12px">
+                <span id="racha-resultado-badge" class="racha-banner" style="display:inline-block"></span>
+            </div>
+            <div class="resultado-seccion">
+                <h3>Por asignatura</h3>
+                <div id="desglose-asignaturas"></div>
+            </div>
+            <div id="seccion-marcadas-res" class="resultado-seccion" style="display:none">
+                <h3>📌 Preguntas marcadas</h3>
+                <div id="lista-marcadas-res"></div>
+            </div>
+            <button class="btn-principal" onclick="volverAlInicio()">Volver al inicio</button>
+            <button class="btn-export" style="background:#eff6ff;font-weight:700" onclick="abrirRevision()">📋 Revisar todas las preguntas</button>
+            <button class="btn-export" onclick="exportarResultados()">⬇ Exportar resultados (.txt)</button>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR PREGUNTA -->
+    <div id="modal-overlay" onclick="if(event.target===this)cerrarModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;overflow-y:auto;padding:20px;box-sizing:border-box">
+        <div style="background:var(--card-bg);border-radius:12px;max-width:480px;margin:0 auto;padding:20px;position:relative" onclick="event.stopPropagation()">
+            <h3 style="margin:0 0 4px;font-size:1em">✏️ Editar pregunta</h3>
+            <p id="modal-id-label" style="font-size:0.72em;color:var(--text-muted);margin:0 0 14px"></p>
+            <span class="etiqueta-filtro" style="margin-top:0">Asignatura</span>
+            <input type="text" id="modal-asig" placeholder="Asignatura" style="margin-bottom:10px">
+            <span class="etiqueta-filtro">Tema</span>
+            <input type="text" id="modal-tema" placeholder="Tema" style="margin-bottom:10px">
+            <span class="etiqueta-filtro">Pregunta</span>
+            <textarea id="modal-preg" rows="3" style="margin-bottom:10px"></textarea>
+            <span class="etiqueta-filtro">Opciones</span>
+            <input type="text" id="modal-op1" placeholder="Opción 1" style="margin-bottom:6px">
+            <input type="text" id="modal-op2" placeholder="Opción 2" style="margin-bottom:6px">
+            <input type="text" id="modal-op3" placeholder="Opción 3" style="margin-bottom:6px">
+            <input type="text" id="modal-op4" placeholder="Opción 4" style="margin-bottom:10px">
+            <span class="etiqueta-filtro">Respuesta correcta</span>
+            <select id="modal-correcta" style="margin-bottom:10px">
+                <option value="1">Opción 1</option>
+                <option value="2">Opción 2</option>
+                <option value="3">Opción 3</option>
+                <option value="4">Opción 4</option>
+            </select>
+            <span class="etiqueta-filtro">Explicación</span>
+            <textarea id="modal-exp" rows="2" style="margin-bottom:16px"></textarea>
+            <input type="hidden" id="modal-id">
+            <div style="display:flex;gap:8px">
+                <button class="btn-principal" style="flex:1;background:#10b981" onclick="guardarEdicion()">💾 Guardar cambios</button>
+                <button class="btn-secundario" style="flex:1" onclick="cerrarModal()">Cancelar</button>
+            </div>
+            <button onclick="eliminarDesdeModal()" style="background:none;border:none;color:var(--error);font-size:0.82em;cursor:pointer;width:100%;margin-top:12px;text-align:center;padding:6px">🗑 Eliminar esta pregunta permanentemente</button>
+        </div>
+    </div>
+    <script src="preguntas.js"></script>
+    <script>
+        // bancoPreguntasOriginal está definido en preguntas.js
+
+        // --- 2. RECUPERAR PREGUNTAS AÑADIDAS (MODO ANKI) ---
+        let preguntasPersonalizadas = JSON.parse(localStorage.getItem('pir_preguntas_custom')) || [];
+        const bancoPreguntasGlobal  = bancoPreguntasOriginal.concat(preguntasPersonalizadas);
+
+        // --- VARIABLES DE ESTADO ---
+        let fallosGuardados   = JSON.parse(localStorage.getItem('pir_fallos'))     || [];
+        let marcadasGuardadas = JSON.parse(localStorage.getItem('pir_marcadas'))   || [];
+        let historialSesiones = JSON.parse(localStorage.getItem('pir_historial'))  || [];
+        let historialSpaced   = JSON.parse(localStorage.getItem('pir_spaced_rep')) || {};
+        let statsGlobales     = JSON.parse(localStorage.getItem('pir_stats'))      || {}; // {asig: {ok,ko}}
+        const preguntasRespondidas = new Set(JSON.parse(localStorage.getItem('pir_respondidas') || '[]'));
+
+        let preguntasActivas     = [];
+        let indiceActual         = 0;
+        let preguntaEnCurso      = null;
+        let modoRepasoFallos     = false;
+        let modoExamen           = false;
+        let modoCiegas           = false;
+        let sesionAciertos       = 0;
+        let sesionFallos         = 0;
+        let sesionBlancos        = 0;
+        let sesionResultados     = [];
+        let pregMarcadaEnSesion  = new Set();
+        let rachaActual          = 0;
+        let rachaMáxima          = 0;
+        let timerInterval        = null;
+        let timerSegundos        = 0;
+
+        // ─── UTILIDADES ────────────────────────────────────────────────
+        const norm  = t => t.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+
+
+        // ─── MODO OSCURO ─────────────────────────────────────────────────
+        function toggleDark(){
+            document.body.classList.toggle('dark');
+            const on=document.body.classList.contains('dark');
+            localStorage.setItem('pir_dark',on?'1':'0');
+            document.getElementById('dark-toggle').textContent=on?'☀️':'🌙';
+        }
+        if(localStorage.getItem('pir_dark')==='1'){document.body.classList.add('dark');document.getElementById('dark-toggle').textContent='☀️';}
+
+        // ─── TOAST ───────────────────────────────────────────────────────
+        let _toastTimer=null;
+        function toast(msg,tipo='ok',ms=2800){
+            const el=document.getElementById('toast');
+            el.textContent=msg;el.className='toast '+tipo+' visible';
+            if(_toastTimer) clearTimeout(_toastTimer);
+            _toastTimer=setTimeout(()=>el.classList.remove('visible'),ms);
+        }
+
+        // ─── TECLADO ─────────────────────────────────────────────────────
+        document.addEventListener('keydown',e=>{
+            // Ignorar si el foco está en un input, textarea o select
+            const tag=document.activeElement.tagName;
+            if(['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
+
+            const enTest=document.getElementById('pantalla-test').style.display!=='none';
+            const enRes=document.getElementById('pantalla-resultados').style.display!=='none';
+            const enRev=document.getElementById('pantalla-revision').style.display!=='none';
+
+            // N = modo oscuro (en cualquier pantalla)
+            if(e.key==='n'||e.key==='N'){ toggleDark(); return; }
+
+            if(enTest){
+                const bots=[...document.querySelectorAll('.btn-opcion')];
+                const respondida=bots.length&&bots[0].disabled;
+                const siguiente=document.getElementById('btn-siguiente');
+                if(!respondida&&['1','2','3','4'].includes(e.key)){
+                    e.preventDefault();
+                    const idx=parseInt(e.key)-1;
+                    if(bots[idx]) bots[idx].click();
+                } else if(respondida&&(e.key===' '||e.key==='ArrowRight')&&siguiente.style.display!=='none'){
+                    e.preventDefault();
+                    siguiente.click();
+                } else if(e.key==='m'||e.key==='M'){
+                    toggleMarcar();
+                } else if(e.key==='Escape'){
+                    confirmarSalir();
+                }
+            }
+            if(enRev&&e.key==='Escape'){
+                volverDeRevision();
+            }
+        });
+
+        // ─── REVISIÓN DEL TEST ───────────────────────────────────────────
+        let revisionData = []; // guardamos para poder filtrar
+
+        function abrirRevision(){
+            // Construir lista completa con info de respuestas
+            revisionData = sesionResultados.map((r,i)=>{
+                const p=bancoPreguntasGlobal.find(x=>x.id===r.id);
+                return {...r, pregunta:p, indice:i+1};
+            });
+            _renderRevision('todas');
+            mostrarPantalla('revision');
+            window.scrollTo(0,0);
+        }
+
+        function filtrarRevision(filtro, btn){
+            document.querySelectorAll('.rev-btn-filtro').forEach(b=>b.classList.remove('activo'));
+            btn.classList.add('activo');
+            _renderRevision(filtro);
+        }
+
+        function _renderRevision(filtro){
+            const lista=document.getElementById('revision-lista');
+            let items=revisionData;
+            if(filtro==='fallos') items=items.filter(r=>r.correcto===false);
+            else if(filtro==='ok')    items=items.filter(r=>r.correcto===true);
+
+            if(!items.length){
+                lista.innerHTML='<div style="text-align:center;color:var(--text-muted);padding:24px;font-size:0.9em">No hay preguntas en este filtro</div>';
+                return;
+            }
+
+            lista.innerHTML=items.map((r,i)=>{
+                const p=r.pregunta;
+                if(!p) return '';
+                const icono=r.correcto===null?'—':r.correcto?'✅':'❌';
+                const cls=r.correcto===null?'bl':r.correcto?'ok':'ko';
+                const uid='rev_'+r.id+'_'+i;
+
+                // Build options display — need to reconstruct shuffled order from original
+                const opcionesHTML=p.opciones.map((op,idx)=>{
+                    const num=idx+1;
+                    let clsOp='rev-opcion';
+                    if(num===p.respuesta_correcta) clsOp+=' correcta';
+                    else if(r.respuestaFisica===num&&r.correcto===false) clsOp+=' incorrecta';
+                    return `<div class="${clsOp}">${op}${num===p.respuesta_correcta?' ✓':''}</div>`;
+                }).join('');
+
+                return `<div class="revision-item ${cls}" id="${uid}">
+                    <div class="revision-item-header" onclick="toggleRevItem('${uid}')">
+                        <span class="rev-pregunta-num">#${r.indice}</span>
+                        <span class="rev-icono">${icono}</span>
+                        <span class="rev-pregunta-texto">${p.pregunta.substring(0,90)}${p.pregunta.length>90?'…':''}</span>
+                        <span style="color:var(--text-muted);font-size:0.8em">▾</span>
+                    </div>
+                    <div class="revision-item-body" id="body_${uid}">
+                        <div class="rev-meta">${p.asignatura} · ${p.tema}</div>
+                        <div style="font-size:0.88em;font-weight:600;margin-bottom:8px">${p.pregunta}</div>
+                        <div class="rev-opciones">${opcionesHTML}</div>
+                        <div class="rev-explicacion">💡 ${p.explicacion||'Sin explicación disponible.'}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleRevItem(uid){
+            const body=document.getElementById('body_'+uid);
+            body.classList.toggle('visible');
+        }
+
+        function volverDeRevision(){
+            mostrarPantalla('resultados');
+            window.scrollTo({top:0,behavior:'smooth'});
+            window.scrollTo(0,0);
+        }
+
+        // ─── OVERRIDE mostrarPantalla para incluir revisión ───────────────
+        function mostrarPantalla(cual){
+            ['config','test','resultados','revision'].forEach(id=>{
+                const el=document.getElementById('pantalla-'+id);
+                if(el) el.style.display=cual===id?'block':'none';
+            });
+            if(cual!=='test'&&timerInterval) clearInterval(timerInterval);
+        }
+
+        // ─── TABLA DE EQUIVALENCIAS ──────────────────────────────────────
+        // Mapea cualquier variante → nombre canónico del banco
+        // Clave: versión normalizada (sin tildes, minúsculas) de la variante
+        // Valor: nombre canónico exacto tal como aparece en el banco
+        const EQUIV_ASIG = {
+            // ── PSICOLOGÍA CLÍNICA ─────────────────────────────────────────
+            // Nombres CEDE, APIR, Persever
+            "psicologia clinica":                              "Psicología Clínica",
+            "clinica":                                         "Psicología Clínica",
+            "clinica integral":                                "Psicología Clínica",
+            "psicopatologia":                                  "Psicología Clínica",
+            "psicopatologia general":                          "Psicología Clínica",
+            "psicopatología":                                  "Psicología Clínica",
+            "psicopatologia descriptiva":                      "Psicología Clínica",
+            "clasificacion y diagnostico":                     "Psicología Clínica",
+            "trastornos mentales":                             "Psicología Clínica",
+            "manual de psicopatologia":                        "Psicología Clínica",
+            "psicologia clinica y psicopatologia":             "Psicología Clínica",
+            "clinica y psicopatologia":                        "Psicología Clínica",
+
+            // ── TRATAMIENTOS ADULTOS ────────────────────────────────────────
+            // Persever llama "Terapias", CEDE "Tratamientos Psicológicos", APIR "Intervención"
+            "tratamientos adultos":                            "Tratamientos Adultos",
+            "terapias":                                        "Tratamientos Adultos",
+            "terapias psicologicas":                           "Tratamientos Adultos",
+            "terapias psicologicas en adultos":                "Tratamientos Adultos",
+            "tratamientos psicologicos":                       "Tratamientos Adultos",
+            "tratamientos psicologicos adultos":               "Tratamientos Adultos",
+            "tratamiento adultos":                             "Tratamientos Adultos",
+            "tratamiento psicologico":                         "Tratamientos Adultos",
+            "intervencion psicologica":                        "Tratamientos Adultos",
+            "intervencion psicologica adultos":                "Tratamientos Adultos",
+            "tecnicas de intervencion":                        "Tratamientos Adultos",
+            "tecnicas de modificacion de conducta":            "Tratamientos Adultos",
+            "modificacion de conducta":                        "Tratamientos Adultos",
+            "tecnicas de tratamiento":                         "Tratamientos Adultos",
+            "terapia psicologica":                             "Tratamientos Adultos",
+            "psicoterapia":                                    "Tratamientos Adultos",
+
+            // ── TRATAMIENTOS INFANTILES ─────────────────────────────────────
+            "tratamientos infantiles":                         "Tratamientos Infantiles",
+            "tratamiento infantil":                            "Tratamientos Infantiles",
+            "infantil":                                        "Tratamientos Infantiles",
+            "clinica infantil":                                "Tratamientos Infantiles",
+            "psicologia clinica infantil":                     "Tratamientos Infantiles",
+            "psicologia infantil":                             "Tratamientos Infantiles",
+            "terapia infantil":                                "Tratamientos Infantiles",
+            "terapias infantiles":                             "Tratamientos Infantiles",
+            "intervencion infantil":                           "Tratamientos Infantiles",
+            "psicopatologia infantil":                         "Tratamientos Infantiles",
+            "trastornos infantiles":                           "Tratamientos Infantiles",
+            "desarrollo y psicopatologia":                     "Tratamientos Infantiles",
+
+            // ── EVALUACIÓN PSICOLÓGICA ──────────────────────────────────────
+            // CEDE: "Evaluación", APIR: "Evaluación Psicológica", Persever: "Evaluación"
+            "evaluacion psicologica":                          "Evaluación Psicológica",
+            "evaluacion":                                      "Evaluación Psicológica",
+            "psicodiagnostico":                                "Evaluación Psicológica",
+            "evaluacion y diagnostico":                        "Evaluación Psicológica",
+            "diagnostico psicologico":                         "Evaluación Psicológica",
+            "tecnicas de evaluacion":                          "Evaluación Psicológica",
+            "evaluacion psicologica clinica":                  "Evaluación Psicológica",
+            "tests psicologicos":                              "Evaluación Psicológica",
+            "medicion":                                        "Evaluación Psicológica",
+            "evaluacion e intervencion":                       "Evaluación Psicológica",
+
+            // ── PSICOLOGÍA EXPERIMENTAL ─────────────────────────────────────
+            // Incluye Psicometría (CEDE la pone aquí), Metodología
+            "psicologia experimental":                         "Psicología Experimental",
+            "experimental":                                    "Psicología Experimental",
+            "metodologia":                                     "Psicología Experimental",
+            "metodologia de investigacion":                    "Psicología Experimental",
+            "psicometria":                                     "Psicología Experimental",
+            "estadistica":                                     "Psicología Experimental",
+            "estadistica y metodologia":                       "Psicología Experimental",
+            "metodos de investigacion":                        "Psicología Experimental",
+            "disenos de investigacion":                        "Psicología Experimental",
+            "diseno experimental":                             "Psicología Experimental",
+            "investigacion en psicologia":                     "Psicología Experimental",
+            "historia y sistemas":                             "Psicología Experimental",
+            "historia de la psicologia":                       "Psicología Experimental",
+
+            // ── PSICOBIOLOGÍA ───────────────────────────────────────────────
+            // CEDE: "Psicobiología", APIR: "Psicobiología", Persever: "Psicobiología"
+            "psicobiologia":                                   "Psicobiología",
+            "neurociencia":                                    "Psicobiología",
+            "bases biologicas":                                "Psicobiología",
+            "bases biologicas de la conducta":                 "Psicobiología",
+            "neuropsicologia":                                 "Psicobiología",
+            "biopsicologia":                                   "Psicobiología",
+            "fisiologia":                                      "Psicobiología",
+            "fisiologia de la conducta":                       "Psicobiología",
+            "neuroanatomia":                                   "Psicobiología",
+            "neurociencia cognitiva":                          "Psicobiología",
+            "psicofisiologia":                                 "Psicobiología",
+            "farmacologia":                                    "Psicobiología",
+
+            // ── PSICOLOGÍA DE LA PERSONALIDAD Y DIFERENCIAL ────────────────
+            // APIR: "Personalidad", CEDE: "Diferencial y Personalidad"
+            "personalidad y diferencial":                      "Psicología de la Personalidad y Diferencial",
+            "diferencial":                                     "Psicología de la Personalidad y Diferencial",
+            "personalidad":                                    "Psicología de la Personalidad y Diferencial",
+            "psicologia de la personalidad":                   "Psicología de la Personalidad y Diferencial",
+            "diferencial y personalidad":                      "Psicología de la Personalidad y Diferencial",
+            "psicologia diferencial":                          "Psicología de la Personalidad y Diferencial",
+            "diferencias individuales":                        "Psicología de la Personalidad y Diferencial",
+            "inteligencia y personalidad":                     "Psicología de la Personalidad y Diferencial",
+            "teorias de la personalidad":                      "Psicología de la Personalidad y Diferencial",
+
+            // ── PSICOLOGÍA EVOLUTIVA ────────────────────────────────────────
+            // Persever: "Evolutiva", CEDE: "Psicología del Desarrollo", APIR: "Evolutiva"
+            "psicologia evolutiva":                            "Psicología Evolutiva",
+            "evolutiva":                                       "Psicología Evolutiva",
+            "desarrollo psicologico":                          "Psicología Evolutiva",
+            "desarrollo":                                      "Psicología Evolutiva",
+            "psicologia del desarrollo":                       "Psicología Evolutiva",
+            "desarrollo humano":                               "Psicología Evolutiva",
+            "ciclo vital":                                     "Psicología Evolutiva",
+            "psicologia del ciclo vital":                      "Psicología Evolutiva",
+            "desarrollo cognitivo":                            "Psicología Evolutiva",
+            "desarrollo evolutivo":                            "Psicología Evolutiva",
+
+            // ── PSICOLOGÍA SOCIAL ───────────────────────────────────────────
+            "psicologia social":                               "Psicología Social",
+            "social":                                          "Psicología Social",
+            "psicologia de los grupos":                        "Psicología Social",
+            "psicologia social aplicada":                      "Psicología Social",
+            "cognicion social":                                "Psicología Social",
+            "actitudes":                                       "Psicología Social",
+            "influencia social":                               "Psicología Social",
+
+            // ── PSICOLOGÍA BÁSICA ───────────────────────────────────────────
+            // CEDE: "Procesos Psicológicos Básicos", APIR: "Psicología Básica"
+            "psicologia basica":                               "Psicología Básica",
+            "basica":                                          "Psicología Básica",
+            "procesos psicologicos basicos":                   "Psicología Básica",
+            "procesos basicos":                                "Psicología Básica",
+            "aprendizaje":                                     "Psicología Básica",
+            "aprendizaje y condicionamiento":                  "Psicología Básica",
+            "atencion":                                        "Psicología Básica",
+            "memoria":                                         "Psicología Básica",
+            "lenguaje":                                        "Psicología Básica",
+            "pensamiento":                                     "Psicología Básica",
+            "motivacion y emocion":                            "Psicología Básica",
+            "cognicion":                                       "Psicología Básica",
+
+            // ── PSICOLOGÍA DE LA SALUD ──────────────────────────────────────
+            "psicologia de la salud":                          "Psicología de la Salud",
+            "salud":                                           "Psicología de la Salud",
+            "psicologia clinica de la salud":                  "Psicología de la Salud",
+            "psicologia medica":                               "Psicología de la Salud",
+        };
+
+        const EQUIV_TEMA = {
+            // ── PSICOLOGÍA CLÍNICA / PSICOPATOLOGÍA ─────────────────────────
+            // Esquizofrenia — CEDE T1, APIR T1, Persever T1
+            "esquizofrenia":                                   "Esquizofrenia y espectro psicótico",
+            "trastornos psicoticos":                           "Esquizofrenia y espectro psicótico",
+            "psicosis":                                        "Esquizofrenia y espectro psicótico",
+            "espectro de la esquizofrenia":                    "Esquizofrenia y espectro psicótico",
+            "esquizofrenia y otros psicoticos":                "Esquizofrenia y espectro psicótico",
+            "trastorno delirante":                             "Esquizofrenia y espectro psicótico",
+            "trastornos del espectro psicotico":               "Esquizofrenia y espectro psicótico",
+
+            // Estado de ánimo — CEDE T2, APIR T2
+            "trastornos del estado de animo":                  "Trastorno del estado de ánimo",
+            "trastorno del estado de animo":                   "Trastorno del estado de ánimo",
+            "depresion":                                       "Trastorno del estado de ánimo",
+            "depresion mayor":                                 "Trastorno del estado de ánimo",
+            "trastorno bipolar":                               "Trastorno del estado de ánimo",
+            "bipolar":                                         "Trastorno del estado de ánimo",
+            "trastornos afectivos":                            "Trastorno del estado de ánimo",
+            "trastornos del humor":                            "Trastorno del estado de ánimo",
+            "distimia":                                        "Trastorno del estado de ánimo",
+            "ciclotimia":                                      "Trastorno del estado de ánimo",
+
+            // Ansiedad — CEDE T4, APIR T4
+            "ansiedad":                                        "Trastornos de ansiedad",
+            "trastornos de ansiedad":                          "Trastornos de ansiedad",
+            "fobia":                                           "Trastornos de ansiedad",
+            "fobia social":                                    "Trastornos de ansiedad",
+            "fobia especifica":                                "Trastornos de ansiedad",
+            "agorafobia":                                      "Trastornos de ansiedad",
+            "panico":                                          "Trastornos de ansiedad",
+            "trastorno de panico":                             "Trastornos de ansiedad",
+            "ansiedad generalizada":                           "Trastornos de ansiedad",
+            "tag":                                             "Trastornos de ansiedad",
+            "ansiedad por separacion":                         "Trastornos de ansiedad",
+
+            // TOC — CEDE T5, APIR T5
+            "toc":                                             "TOC y relacionados",
+            "trastorno obsesivo compulsivo":                   "TOC y relacionados",
+            "obsesivo compulsivo":                             "TOC y relacionados",
+            "ocd":                                             "TOC y relacionados",
+            "dismorfofobia":                                   "TOC y relacionados",
+            "acumulacion":                                     "TOC y relacionados",
+            "tricotilomania":                                   "TOC y relacionados",
+            "excoriacion":                                     "TOC y relacionados",
+
+            // Traumas — CEDE T6, APIR T6
+            "trauma":                                          "Trauma y estresores",
+            "tept":                                            "Trauma y estresores",
+            "ptsd":                                            "Trauma y estresores",
+            "trastorno por estres postraumatico":              "Trauma y estresores",
+            "trastornos asociados a traumas":                  "Trauma y estresores",
+            "traumas y estresores":                            "Trauma y estresores",
+            "trastorno de adaptacion":                         "Trauma y estresores",
+            "estres agudo":                                    "Trauma y estresores",
+            "reaccion al estres":                              "Trauma y estresores",
+
+            // Disociativos — CEDE T7
+            "disociacion":                                     "Trastornos disociativos",
+            "trastornos disociativos":                         "Trastornos disociativos",
+            "disociativo":                                     "Trastornos disociativos",
+            "amnesia disociativa":                             "Trastornos disociativos",
+            "despersonalizacion":                              "Trastornos disociativos",
+
+            // Somáticos — CEDE T8
+            "trastornos de sintomas somaticos":                "Trastornos de síntomas somáticos",
+            "somaticos":                                       "Trastornos de síntomas somáticos",
+            "somatizacion":                                    "Trastornos de síntomas somáticos",
+            "hipocondria":                                     "Trastornos de síntomas somáticos",
+            "trastorno somatomorfo":                           "Trastornos de síntomas somáticos",
+            "sintomas somaticos":                              "Trastornos de síntomas somáticos",
+            "trastorno funcional":                             "Trastornos de síntomas somáticos",
+            "dolor cronico":                                   "Trastornos de síntomas somáticos",
+
+            // TCA — CEDE T9
+            "trastornos alimentarios":                         "Trastornos alimentarios",
+            "tca":                                             "Trastornos alimentarios",
+            "anorexia":                                        "Trastornos alimentarios",
+            "anorexia nerviosa":                               "Trastornos alimentarios",
+            "bulimia":                                         "Trastornos alimentarios",
+            "bulimia nerviosa":                                "Trastornos alimentarios",
+            "trastornos de la conducta alimentaria":           "Trastornos alimentarios",
+            "atracones":                                       "Trastornos alimentarios",
+            "pica":                                            "Trastornos alimentarios",
+            "ingestion de alimentos":                          "Trastornos alimentarios",
+
+            // Sueño — CEDE T10
+            "sueno":                                           "Trastornos del sueño",
+            "trastornos del sueno":                            "Trastornos del sueño",
+            "insomnio":                                        "Trastornos del sueño",
+            "parasomnia":                                      "Trastornos del sueño",
+            "hipersomnia":                                     "Trastornos del sueño",
+            "apnea del sueno":                                 "Trastornos del sueño",
+
+            // Sexual — CEDE T11
+            "disfunciones sexuales":                           "Disfunciones sexuales y parafilias",
+            "sexualidad":                                      "Disfunciones sexuales y parafilias",
+            "disforia de genero":                              "Disfunciones sexuales y parafilias",
+            "parafilias":                                      "Disfunciones sexuales y parafilias",
+            "trastorno de identidad de genero":                "Disfunciones sexuales y parafilias",
+            "disfuncion erectil":                              "Disfunciones sexuales y parafilias",
+
+            // Disruptivos — CEDE T13
+            "disruptivos":                                     "Trastornos disruptivos",
+            "trastornos disruptivos":                          "Trastornos disruptivos",
+            "control de impulsos":                             "Trastornos disruptivos",
+            "tdah":                                            "Trastornos disruptivos",
+            "trastorno por deficit de atencion":               "Trastornos disruptivos",
+            "deficit de atencion e hiperactividad":            "Trastornos disruptivos",
+            "trastorno negativista desafiante":                "Trastornos disruptivos",
+            "trastorno de conducta":                           "Trastornos disruptivos",
+            "piromanía":                                       "Trastornos disruptivos",
+            "kleptomanía":                                     "Trastornos disruptivos",
+
+            // Adicciones — CEDE T14
+            "adiccion":                                        "Trastornos adictivos",
+            "sustancias":                                      "Trastornos adictivos",
+            "adiccion a sustancias":                           "Trastornos adictivos",
+            "drogodependencias":                               "Trastornos adictivos",
+            "alcoholismo":                                     "Trastornos adictivos",
+            "alcohol":                                         "Trastornos adictivos",
+            "drogas":                                          "Trastornos adictivos",
+            "juego patologico":                                "Trastornos adictivos",
+            "ludopatia":                                       "Trastornos adictivos",
+            "trastornos adictivos":                            "Trastornos adictivos",
+            "dependencia":                                     "Trastornos adictivos",
+            "abuso de sustancias":                             "Trastornos adictivos",
+
+            // Neurocognitivos — CEDE T15
+            "trastornos neurocognitivos":                      "Trastornos neurocognitivos",
+            "neurocognitivos":                                 "Trastornos neurocognitivos",
+            "demencia":                                        "Trastornos neurocognitivos",
+            "deterioro cognitivo":                             "Trastornos neurocognitivos",
+            "alzheimer":                                       "Trastornos neurocognitivos",
+            "delirium":                                        "Trastornos neurocognitivos",
+            "trastorno neurocognitivo mayor":                  "Trastornos neurocognitivos",
+            "deterioro cognitivo leve":                        "Trastornos neurocognitivos",
+
+            // Personalidad — CEDE T16
+            "tp":                                              "Trastornos de la personalidad",
+            "trastornos de la personalidad":                   "Trastornos de la personalidad",
+            "personalidad patologica":                         "Trastornos de la personalidad",
+            "trastorno limite":                                "Trastornos de la personalidad",
+            "tpb":                                             "Trastornos de la personalidad",
+            "borderline":                                      "Trastornos de la personalidad",
+            "antisocial":                                      "Trastornos de la personalidad",
+            "narcisista":                                      "Trastornos de la personalidad",
+            "paranoide":                                       "Trastornos de la personalidad",
+            "esquizoide":                                      "Trastornos de la personalidad",
+
+            // ── PSICOBIOLOGÍA ──────────────────────────────────────────────
+            "neurona":                                         "Nivel celular: la neurona",
+            "celula nerviosa":                                 "Nivel celular: la neurona",
+            "nivel celular":                                   "Nivel celular: la neurona",
+            "genetica":                                        "Aproximación a la genética",
+            "genetica de la conducta":                         "Aproximación a la genética",
+            "bases geneticas":                                 "Aproximación a la genética",
+            "farmacos":                                        "Psicofarmacología",
+            "psicofarmacologia":                               "Psicofarmacología",
+            "farmacos en el sn":                               "Psicofarmacología",
+            "farmacos en el sistema nervioso":                 "Psicofarmacología",
+            "antidepresivos":                                  "Psicofarmacología",
+            "antipsicoticos":                                  "Psicofarmacología",
+            "ansioliticos":                                    "Psicofarmacología",
+            "neurotrasmisores":                                "Psicofarmacología",
+            "neurotransmisores":                               "Psicofarmacología",
+            "desarrollo del sn":                               "Desarrollo del SN",
+            "desarrollo del sistema nervioso":                 "Desarrollo del SN",
+            "estructura del sn":                               "Estructura del SN",
+            "estructura del sistema nervioso":                 "Estructura del SN",
+            "sistema nervioso central":                        "Estructura del SN",
+            "snc":                                             "Estructura del SN",
+            "estructuras subcorticales":                       "SNC I: estructuras subcorticales",
+            "ganglios basales":                                "SNC I: estructuras subcorticales",
+            "sistema limbico":                                 "SNC I: estructuras subcorticales",
+            "amigdala":                                        "SNC I: estructuras subcorticales",
+            "hipocampo":                                       "SNC I: estructuras subcorticales",
+            "talamo":                                          "SNC I: estructuras subcorticales",
+            "corteza cerebral":                                "SNC II: corteza cerebral",
+            "cortex":                                          "SNC II: corteza cerebral",
+            "lobulos cerebrales":                              "SNC II: corteza cerebral",
+            "areas corticales":                                "SNC II: corteza cerebral",
+            "sistema nervioso periferico":                     "SNP",
+            "sistema nervioso autonomo":                       "SNP",
+            "snp":                                             "SNP",
+            "sna":                                             "SNP",
+            "nervios perifericos":                             "SNP",
+            "metodos de investigacion":                        "Métodos investigación y diagnóstico",
+            "tecnicas de neuroimagen":                         "Métodos investigación y diagnóstico",
+            "neuroimagen":                                     "Métodos investigación y diagnóstico",
+            "eeg":                                             "Métodos investigación y diagnóstico",
+            "lesiones cerebrales":                             "Métodos investigación y diagnóstico",
+            "neuroendocrinologia":                             "Neuroendocrinología",
+            "sistema endocrino":                               "Neuroendocrinología",
+            "hormonas":                                        "Neuroendocrinología",
+            "hipotalamo":                                      "Neuroendocrinología",
+            "hipofisis":                                       "Neuroendocrinología",
+            "neurobiologia del sexo":                          "Neurobiología del sexo",
+            "diferencias sexuales":                            "Neurobiología del sexo",
+            "percepcion":                                      "Sistemas perceptivos",
+            "vision":                                          "Sistemas perceptivos",
+            "audicion":                                        "Sistemas perceptivos",
+            "sensacion y percepcion":                          "Sistemas perceptivos",
+            "motricidad":                                      "Sistema motor",
+            "control motor":                                   "Sistema motor",
+            "movimiento":                                      "Sistema motor",
+            "funciones cognitivas":                            "Funciones cognitivas superiores",
+            "atencion y memoria":                              "Funciones cognitivas superiores",
+            "funciones ejecutivas":                            "Funciones cognitivas superiores",
+            "lenguaje y cerebro":                              "Funciones cognitivas superiores",
+            "ritmos biologicos":                               "Ritmos biológicos y sueño",
+            "cronobiologia":                                   "Ritmos biológicos y sueño",
+            "sueno biologico":                                 "Ritmos biológicos y sueño",
+            "ritmo circadiano":                                "Ritmos biológicos y sueño",
+            "emociones":                                       "Emoción",
+            "neurobiologia de la emocion":                     "Emoción",
+            "emocion y cerebro":                               "Emoción",
+
+            // ── EVALUACIÓN PSICOLÓGICA ─────────────────────────────────────
+            "psicometria":                                     "Psicometría",
+            "teoria de los tests":                             "Psicometría",
+            "fiabilidad y validez":                            "Psicometría",
+            "ttr":                                             "Psicometría",
+            "teoria de respuesta al item":                     "Psicometría",
+            "tri":                                             "Psicometría",
+            "normas y baremacion":                             "Psicometría",
+            "entrevista clinica":                              "Entrevista y técnicas de exploración",
+            "entrevista":                                      "Entrevista y técnicas de exploración",
+            "tecnicas de observacion":                         "Entrevista y técnicas de exploración",
+            "observacion":                                     "Entrevista y técnicas de exploración",
+            "tecnicas proyectivas":                            "Técnicas proyectivas",
+            "rorschach":                                       "Técnicas proyectivas",
+            "tat":                                             "Técnicas proyectivas",
+
+            // ── PSICOLOGÍA EXPERIMENTAL / METODOLOGÍA ─────────────────────
+            "disenios de investigacion":                       "Diseños de investigación",
+            "disenos de investigacion":                        "Diseños de investigación",
+            "diseno cuasi experimental":                       "Diseños de investigación",
+            "diseno experimental":                             "Diseños de investigación",
+            "condicionamiento clasico":                        "Aprendizaje y condicionamiento",
+            "condicionamiento operante":                       "Aprendizaje y condicionamiento",
+            "pavlov":                                          "Aprendizaje y condicionamiento",
+            "skinner":                                         "Aprendizaje y condicionamiento",
+            "refuerzo":                                        "Aprendizaje y condicionamiento",
+            "extincion":                                       "Aprendizaje y condicionamiento",
+
+            // ── PSICOLOGÍA BÁSICA ──────────────────────────────────────────
+            "memoria de trabajo":                              "Memoria",
+            "memoria a largo plazo":                           "Memoria",
+            "atencion selectiva":                              "Atención",
+            "atencion sostenida":                              "Atención",
+            "atencion dividida":                               "Atención",
+            "motivacion":                                      "Motivación y emoción",
+            "emocion basica":                                  "Motivación y emoción",
+            "afecto":                                          "Motivación y emoción",
+
+            // ── PSICOLOGÍA SOCIAL ──────────────────────────────────────────
+            "actitudes y cambio de actitudes":                 "Actitudes",
+            "persuasion":                                      "Actitudes",
+            "disonancia cognitiva":                            "Actitudes",
+            "estereotipos":                                    "Prejuicio y discriminación",
+            "prejuicio":                                       "Prejuicio y discriminación",
+            "discriminacion":                                  "Prejuicio y discriminación",
+            "grupo":                                           "Psicología de grupos",
+            "liderazgo":                                       "Psicología de grupos",
+            "conformidad":                                     "Influencia social",
+            "obediencia":                                      "Influencia social",
+            "conducta prosocial":                              "Conducta social",
+            "agresion":                                        "Conducta social",
+
+            // ── PSICOLOGÍA EVOLUTIVA ───────────────────────────────────────
+            "desarrollo prenatal":                             "Desarrollo prenatal y neonatal",
+            "neonato":                                         "Desarrollo prenatal y neonatal",
+            "piaget":                                          "Desarrollo cognitivo",
+            "desarrollo cognitivo infantil":                   "Desarrollo cognitivo",
+            "vygotsky":                                        "Desarrollo cognitivo",
+            "apego":                                           "Desarrollo socioemocional",
+            "bowlby":                                          "Desarrollo socioemocional",
+            "ainsworth":                                       "Desarrollo socioemocional",
+            "adolescencia":                                    "Desarrollo en la adolescencia",
+            "identidad":                                       "Desarrollo en la adolescencia",
+            "vejez":                                           "Desarrollo en la adultez y vejez",
+            "envejecimiento":                                  "Desarrollo en la adultez y vejez",
+
+            // ── PERSONALIDAD Y DIFERENCIAL ─────────────────────────────────
+            "cinco grandes":                                   "Modelos factoriales de personalidad",
+            "big five":                                        "Modelos factoriales de personalidad",
+            "eysenck":                                         "Modelos factoriales de personalidad",
+            "cattell":                                         "Modelos factoriales de personalidad",
+            "inteligencia":                                    "Inteligencia y aptitudes",
+            "cociente intelectual":                            "Inteligencia y aptitudes",
+            "ci":                                              "Inteligencia y aptitudes",
+            "inteligencia emocional":                          "Inteligencia y aptitudes",
+        };
+
+        function mostrarHintEquiv(inputId, hintId, tabla) {
+            const val = document.getElementById(inputId).value.trim();
+            const hint = document.getElementById(hintId);
+            if (!val) { hint.textContent = ''; return; }
+            const canonico = normalizarEntrada(val, tabla);
+            if (norm(canonico) !== norm(val)) {
+                hint.textContent = `✓ Se guardará como: "${canonico}"`;
+            } else {
+                hint.textContent = '';
+            }
+        }
+
+        function normalizarEntrada(valor, tablaEquiv) {
+            const clave = norm(valor);
+            return tablaEquiv[clave] || valor; // si hay equivalencia la aplica, si no deja el original
+        }
+        const clase = p => p>=85?'excelente':p>=65?'bien':p>=45?'mejorar':'mal';
+        const cvar  = c => c==='excelente'?'success':c==='mal'?'error':c==='bien'?'primary':'text-muted';
+        function barajar(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+        function fFecha(ts){const d=new Date(ts);return d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit'})+' '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});}
+        function fTiempo(s){return`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;}
+        function getMulti(id){
+            if(id==='filtro-asignatura') return asigActivas();
+            // Para otros selects normales (filtro-tema)
+            const s=document.getElementById(id);
+            if(!s) return ['Todos'];
+            const v=Array.from(s.selectedOptions).map(o=>o.value);
+            const sinTodas=v.filter(x=>x!=='Todos');
+            return sinTodas.length ? sinTodas : ['Todos'];
+        }
+        // mostrarPantalla definida arriba con soporte para revisión
+
+        // ─── TABS ───────────────────────────────────────────────────────
+        function cambiarTab(id, btn) {
+            document.querySelectorAll('#pantalla-config > .tabs-config .tab-btn').forEach(b=>b.classList.remove('activo'));
+            document.querySelectorAll('#pantalla-config > .tab-panel').forEach(p=>p.classList.remove('activo'));
+            document.getElementById(id).classList.add('activo');
+            if(btn) btn.classList.add('activo');
+            if(id==='tab-historial'){renderHistorial();renderStatsGlobales();}
+            if(id==='tab-examen'){actualizarContadorExamen();}
+            if(id==='tab-buscar'){
+                document.getElementById('input-buscador').focus();
+                document.getElementById('resultados-busqueda').innerHTML='';
+                document.getElementById('input-buscador').value='';
+            }
+            if(id==='tab-añadir'){rellenarSelectsAnki();renderMisPreguntas();}
+        }
+        function cambiarSubTab(id, btn) {
+            const parent = btn.closest('.tab-panel') || btn.closest('[id^="subtab"]')?.parentElement;
+            parent.querySelectorAll('[id^="subtab-"]').forEach(p=>{if(!p.classList.contains('tabs-config'))p.style.display='none';});
+            parent.querySelectorAll('.tabs-config .tab-btn').forEach(b=>b.classList.remove('activo'));
+            document.getElementById(id).style.display='block';
+            btn.classList.add('activo');
+            if(id==='subtab-stats') renderStatsGlobales();
+            if(id==='subtab-mias') renderMisPreguntas();
+            if(id==='subtab-nueva') rellenarSelectsAnki();
+            if(id==='subtab-banco') renderBancoCompleto();
+        }
+
+        // ─── DESPLEGABLE TEMAS Y CONTADORES ─────────────────────────────
+
+        // ─── SELECTOR ASIGNATURAS ────────────────────────────────────────
+        let asigSeleccionadas = new Set(); // vacío = Todas
+
+        // Especiales exclusivos (no se combinan con nada)
+        const ESP_EXCLUSIVOS = ['Todas', 'Spaced'];
+
+        function seleccionarEspecial(val){
+            if(ESP_EXCLUSIVOS.includes(val)){
+                // Exclusivos: desactivan todo lo demás
+                document.querySelectorAll('.asig-btn-esp').forEach(b=>b.classList.remove('activo'));
+                document.querySelectorAll('.asig-btn').forEach(b=>b.classList.remove('activo'));
+                asigSeleccionadas.clear();
+                document.getElementById('esp-'+val).classList.add('activo');
+            } else {
+                // Fallos / Marcadas / NoHechas: toggle, se pueden combinar con asignaturas
+                // Desactivar exclusivos si estaban activos
+                ESP_EXCLUSIVOS.forEach(e=>{
+                    const el=document.getElementById('esp-'+e);
+                    if(el) el.classList.remove('activo');
+                });
+                const btn=document.getElementById('esp-'+val);
+                btn.classList.toggle('activo');
+                // Si no queda nada activo, volver a Todas
+                const hayAlgo=document.querySelector('.asig-btn-esp.activo,.asig-btn.activo');
+                if(!hayAlgo) document.getElementById('esp-Todas').classList.add('activo');
+            }
+            actualizarDesplegableTemas();
+        }
+
+        function toggleAsig(btn){
+            // Desactivar exclusivos
+            ESP_EXCLUSIVOS.forEach(e=>{
+                const el=document.getElementById('esp-'+e);
+                if(el) el.classList.remove('activo');
+            });
+            const val=btn.dataset.val;
+            btn.classList.toggle('activo');
+            if(btn.classList.contains('activo')) asigSeleccionadas.add(val);
+            else asigSeleccionadas.delete(val);
+            // Si no queda nada activo, volver a Todas
+            const hayAlgo=document.querySelector('.asig-btn-esp.activo,.asig-btn.activo');
+            if(!hayAlgo) document.getElementById('esp-Todas').classList.add('activo');
+            actualizarDesplegableTemas();
+        }
+
+        function asigActivas(){
+            const esps=[...document.querySelectorAll('.asig-btn-esp.activo')].map(b=>b.dataset.val);
+            const asigs=[...document.querySelectorAll('.asig-btn.activo')].map(b=>b.dataset.val);
+            return [...esps, ...asigs].length ? [...esps, ...asigs] : ['Todas'];
+        }
+
+        // Inicializar: activar "Todas" por defecto
+        function inicializarSelectorAsig(){
+            const lf=JSON.parse(localStorage.getItem('pir_lastfilters')||'null');
+            if(lf&&lf.asigs&&lf.asigs.length){
+                const especiales=['Todas','NoHechas','Spaced','Fallos','Marcadas'];
+                if(especiales.includes(lf.asigs[0])){
+                    const el=document.getElementById('esp-'+lf.asigs[0]);
+                    if(el) el.classList.add('activo');
+                } else {
+                    lf.asigs.forEach(a=>{
+                        const btn=document.querySelector(`.asig-btn[data-val="${a}"]`);
+                        if(btn){ btn.classList.add('activo'); asigSeleccionadas.add(a); }
+                    });
+                }
+            } else {
+                document.getElementById('esp-Todas').classList.add('activo');
+            }
+        }
+
+        // onChangeAsignatura removed — now handled by seleccionarEspecial/toggleAsig
+
+        function actualizarDesplegableTemas() {
+            const asigs = getMulti('filtro-asignatura');
+            const sel   = document.getElementById('filtro-tema');
+            sel.innerHTML = '<option value="Todos" selected>Todos los temas disponibles</option>';
+            let base = obtenerBase(asigs);
+            [...new Set(base.map(p=>p.tema))].sort().forEach(t=>{
+                if(t){const o=document.createElement('option');o.value=o.textContent=t;sel.appendChild(o);}
+            });
+            // Contadores
+            document.getElementById('info-banco-asig').textContent = `${base.length} pregunta${base.length!==1?'s':''} disponibles`;
+            const noHechas = bancoPreguntasGlobal.filter(p=>!preguntasRespondidas.has(p.id)).length;
+            const nhEl = document.getElementById('info-banco-nohechas');
+            if(nhEl) nhEl.textContent = '🆕 ' + noHechas + ' sin responder aún';
+            document.getElementById('info-banco-tema').textContent = '';
+            renderizarPanelFallosConfig();
+        }
+        function actualizarContadorTema(){
+            const asigs = getMulti('filtro-asignatura');
+            const temas = getMulti('filtro-tema');
+            let base = obtenerBase(asigs);
+            if(!temas.includes('Todos')) base = base.filter(p=>temas.includes(p.tema));
+            document.getElementById('info-banco-tema').textContent = `${base.length} pregunta${base.length!==1?'s':''} en selección`;
+        }
+        document.addEventListener('change', e=>{ if(e.target.id==='filtro-tema') actualizarContadorTema(); });
+
+        function obtenerBase(asigs){
+            // Exclusivos puros
+            if(asigs.includes('Todas'))  return bancoPreguntasGlobal;
+            if(asigs.includes('Spaced')){ const now=Date.now(); return bancoPreguntasGlobal.filter(p=>historialSpaced[p.id]&&now>=historialSpaced[p.id]); }
+
+            // Filtros combinables: primero calcular el pool base por asignatura
+            const asigsConcetas=asigs.filter(a=>!['Fallos','Marcadas','NoHechas','Todas','Spaced'].includes(a));
+            let pool = asigsConcetas.length
+                ? bancoPreguntasGlobal.filter(p=>asigsConcetas.some(a=>norm(p.asignatura)===norm(a)))
+                : bancoPreguntasGlobal;
+
+            // Luego aplicar filtros especiales combinables (intersección)
+            if(asigs.includes('Fallos'))    pool=pool.filter(p=>fallosGuardados.includes(p.id));
+            if(asigs.includes('Marcadas'))  pool=pool.filter(p=>marcadasGuardadas.includes(p.id));
+            if(asigs.includes('NoHechas'))  pool=pool.filter(p=>!preguntasRespondidas.has(p.id));
+
+            return pool;
+        }
+        function filtrarPreguntas(asigs, temas, cantidad){
+            let q = obtenerBase(asigs);
+            if(!temas.includes('Todos')) q=q.filter(p=>temas.includes(p.tema));
+            barajar(q);
+            if(cantidad!=='Todas') q=q.slice(0,parseInt(cantidad));
+            return q;
+        }
+
+        // ─── PANEL FALLOS CONFIG ─────────────────────────────────────────
+        function renderizarPanelFallosConfig(){
+            const panel=document.getElementById('panel-fallos-config');
+            const lista=document.getElementById('lista-fallos-asig');
+            if(!fallosGuardados.length){panel.style.display='none';return;}
+            panel.style.display='block'; lista.innerHTML='';
+            const preg=bancoPreguntasGlobal.filter(p=>fallosGuardados.includes(p.id));
+            const porAsig={};
+            preg.forEach(p=>{if(!porAsig[p.asignatura])porAsig[p.asignatura]={};porAsig[p.asignatura][p.tema]=(porAsig[p.asignatura][p.tema]||0)+1;});
+            Object.entries(porAsig).forEach(([asig,temas])=>{
+                const total=Object.values(temas).reduce((a,b)=>a+b,0);
+                const uid='fa_'+asig.replace(/\W/g,'_');
+                const div=document.createElement('div');
+                div.className='fila-fallo-asig';div.style.flexWrap='wrap';
+                div.innerHTML=`<span style="flex:1;font-weight:600">${asig}</span><span class="badge-fallo">${total} fallo${total>1?'s':''}</span><button class="btn-ver-temas-fallo" onclick="toggleTablaFalloConfig('${uid}')">ver temas ▾</button><div class="tabla-temas-fallo" id="${uid}" style="width:100%">${Object.entries(temas).map(([t,n])=>`<div class="fila-tema-fallo"><span>${t}</span><span class="badge-fallo">${n}</span></div>`).join('')}</div>`;
+                lista.appendChild(div);
+            });
+        }
+        function toggleTablaFalloConfig(uid){document.getElementById(uid).classList.toggle('visible');}
+
+        // ─── SELECTS AÑADIR PREGUNTA ─────────────────────────────────────
+        function rellenarSelectsAnki(){
+            const asigs=[...new Set(bancoPreguntasGlobal.map(p=>p.asignatura))].sort();
+            const selAsig=document.getElementById('anki-asig-sel');
+            const current=selAsig.value;
+            selAsig.innerHTML='<option value="">— Selecciona o escribe abajo —</option>';
+            asigs.forEach(a=>{const o=document.createElement('option');o.value=o.textContent=a;selAsig.appendChild(o);});
+            if(current) selAsig.value=current;
+            // Temas se actualizan cuando se elige asignatura
+            actualizarTemasAnki();
+        }
+        function sincronizarAsigAnki(){
+            const v=document.getElementById('anki-asig-sel').value;
+            if(v) document.getElementById('anki-asig').value=v;
+            actualizarTemasAnki();
+        }
+        function sincronizarAsigAnkiDesdeInput(){
+            document.getElementById('anki-asig-sel').value='';
+            actualizarTemasAnki();
+        }
+        function actualizarTemasAnki(){
+            const asigSel=document.getElementById('anki-asig-sel').value.trim();
+            const asigInput=document.getElementById('anki-asig').value.trim();
+            const asig=asigSel||asigInput;
+            // Si la asignatura existe en el banco, filtra sus temas; si no, muestra todos
+            const asigExiste=asig && bancoPreguntasGlobal.some(p=>norm(p.asignatura)===norm(asig));
+            const temas=[...new Set(
+                (asigExiste ? bancoPreguntasGlobal.filter(p=>norm(p.asignatura)===norm(asig)) : bancoPreguntasGlobal)
+                .map(p=>p.tema)
+            )].sort();
+            const selTema=document.getElementById('anki-tema-sel');
+            const cur=selTema.value;
+            selTema.innerHTML='<option value="">— Selecciona o escribe abajo —</option>';
+            temas.forEach(t=>{const o=document.createElement('option');o.value=o.textContent=t;selTema.appendChild(o);});
+            if(cur) selTema.value=cur;
+        }
+        function sincronizarTemaAnki(){
+            const v=document.getElementById('anki-tema-sel').value;
+            if(v) document.getElementById('anki-tema').value=v;
+        }
+        function sincronizarTemaAnkiDesdeInput(){document.getElementById('anki-tema-sel').value='';}
+
+        // ─── GUARDAR PREGUNTA ANKI ────────────────────────────────────────
+        function guardarPreguntaAnki(){
+            const asig = normalizarEntrada((document.getElementById('anki-asig-sel').value||document.getElementById('anki-asig').value).trim(), EQUIV_ASIG);
+            const tema = normalizarEntrada((document.getElementById('anki-tema-sel').value||document.getElementById('anki-tema').value).trim(), EQUIV_TEMA);
+            const preg=document.getElementById('anki-preg').value.trim();
+            const op1=document.getElementById('anki-op1').value.trim();
+            const op2=document.getElementById('anki-op2').value.trim();
+            const op3=document.getElementById('anki-op3').value.trim();
+            const op4=document.getElementById('anki-op4').value.trim();
+            const correcta=parseInt(document.getElementById('anki-correcta').value);
+            const exp=document.getElementById('anki-exp').value.trim();
+            if(!asig||!tema||!preg||!op1||!op2){alert('Rellena al menos Asignatura, Tema, Pregunta y dos opciones.');return;}
+            const nq={id:'CUSTOM_'+Date.now(),asignatura:asig,tema:tema,pregunta:preg,opciones:[op1,op2,op3,op4].filter(o=>o),respuesta_correcta:correcta,explicacion:exp||'Añadida por el usuario.'};
+            preguntasPersonalizadas.push(nq);
+            localStorage.setItem('pir_preguntas_custom',JSON.stringify(preguntasPersonalizadas));
+            bancoPreguntasGlobal.push(nq);
+
+            // Si la asignatura es nueva, añadirla al selector principal de filtros
+            const selFiltro=document.getElementById('filtro-asignatura');
+            const yaExiste=[...selFiltro.options].some(o=>norm(o.value)===norm(asig));
+            if(!yaExiste){
+                const o=document.createElement('option');
+                o.value=asig;o.textContent=asig;
+                selFiltro.appendChild(o);
+            }
+            ['anki-asig','anki-tema','anki-preg','anki-op1','anki-op2','anki-op3','anki-op4','anki-exp'].forEach(id=>document.getElementById(id).value='');
+            document.getElementById('anki-asig-sel').value='';
+            document.getElementById('anki-tema-sel').value='';
+            toast(`✅ Guardada en "${asig}" · ${tema}`, 'ok');
+            actualizarDesplegableTemas();
+            rellenarSelectsAnki();
+        }
+
+        // ─── MIS PREGUNTAS ────────────────────────────────────────────────
+        function renderMisPreguntas(){
+            const cont=document.getElementById('lista-custom-preguntas');
+            if(!preguntasPersonalizadas.length){cont.innerHTML='<div class="no-custom">Aún no has añadido preguntas propias.<br><small style="color:var(--text-muted)">Usa ✏️ Nueva pregunta para añadir.</small></div>';return;}
+            cont.innerHTML=preguntasPersonalizadas.map((p,i)=>`
+                <div class="banco-item">
+                    <div class="banco-item-texto">
+                        <div>${p.pregunta.substring(0,90)}${p.pregunta.length>90?'…':''}</div>
+                        <div class="banco-item-meta">${p.asignatura} · ${p.tema}</div>
+                    </div>
+                    <div class="banco-item-acciones">
+                        <button class="btn-editar" onclick="abrirModal('${p.id}')">✏️</button>
+                        <button class="btn-borrar-banco" onclick="borrarCustom(${i})">🗑</button>
+                    </div>
+                </div>`).join('');
+        }
+        function borrarCustom(idx){
+            if(!confirm('¿Eliminar esta pregunta?'))return;
+            const id=preguntasPersonalizadas[idx].id;
+            preguntasPersonalizadas.splice(idx,1);
+            localStorage.setItem('pir_preguntas_custom',JSON.stringify(preguntasPersonalizadas));
+            const gi=bancoPreguntasGlobal.findIndex(p=>p.id===id);
+            if(gi>=0) bancoPreguntasGlobal.splice(gi,1);
+            renderMisPreguntas();actualizarDesplegableTemas();
+            toast('Pregunta eliminada','ok');
+        }
+
+        // ─── BANCO COMPLETO (ver/editar/eliminar cualquier pregunta) ──────
+        let bancoPagina=0;
+        const BANCO_POR_PAG=20;
+        let bancoFiltrado=[];
+
+        function renderBancoCompleto(){
+            bancoFiltrado=[...bancoPreguntasGlobal];
+            bancoPagina=0;
+            _renderBancoPag();
+        }
+        function filtrarBanco(){
+            const q=document.getElementById('banco-buscar').value.trim().toLowerCase();
+            bancoFiltrado=q
+                ? bancoPreguntasGlobal.filter(p=>
+                    p.pregunta.toLowerCase().includes(q)||
+                    p.asignatura.toLowerCase().includes(q)||
+                    p.tema.toLowerCase().includes(q))
+                : [...bancoPreguntasGlobal];
+            bancoPagina=0;
+            _renderBancoPag();
+        }
+        function _renderBancoPag(){
+            const cont=document.getElementById('lista-banco-completo');
+            const total=bancoFiltrado.length;
+            const totalPags=Math.ceil(total/BANCO_POR_PAG);
+            document.getElementById('banco-count').textContent=total+' pregunta'+(total!==1?'s':'');
+            const slice=bancoFiltrado.slice(bancoPagina*BANCO_POR_PAG,(bancoPagina+1)*BANCO_POR_PAG);
+            if(!slice.length){cont.innerHTML='<div class="no-custom">Sin resultados.</div>';return;}
+            const isCustom=id=>preguntasPersonalizadas.some(p=>p.id===id);
+            cont.innerHTML=slice.map(p=>`
+                <div class="banco-item">
+                    <div class="banco-item-texto">
+                        <div>${p.pregunta.substring(0,85)}${p.pregunta.length>85?'…':''}${isCustom(p.id)?'<span class="banco-custom-badge">MÍA</span>':''}</div>
+                        <div class="banco-item-meta">${p.asignatura} · ${p.tema} · RC:${p.respuesta_correcta}</div>
+                    </div>
+                    <div class="banco-item-acciones">
+                        <button class="btn-editar" onclick="abrirModal('${p.id}')">✏️</button>
+                        <button class="btn-borrar-banco" onclick="eliminarDeBanco('${p.id}')">🗑</button>
+                    </div>
+                </div>`).join('')+
+                (totalPags>1?`<div class="banco-paginacion">
+                    <button class="pag-btn" onclick="bancoPagina--;_renderBancoPag()" ${bancoPagina===0?'disabled':''}>← Ant</button>
+                    <span>${bancoPagina+1} / ${totalPags}</span>
+                    <button class="pag-btn" onclick="bancoPagina++;_renderBancoPag()" ${bancoPagina>=totalPags-1?'disabled':''}>Sig →</button>
+                </div>`:'');
+        }
+
+        // ─── MODAL EDITAR ─────────────────────────────────────────────────
+        let modalId=null;
+        function abrirModal(id){
+            const p=bancoPreguntasGlobal.find(x=>x.id===id);
+            if(!p) return;
+            modalId=id;
+            document.getElementById('modal-id').value=id;
+            document.getElementById('modal-id-label').textContent='ID: '+id;
+            document.getElementById('modal-asig').value=p.asignatura;
+            document.getElementById('modal-tema').value=p.tema;
+            document.getElementById('modal-preg').value=p.pregunta;
+            const ops=p.opciones||[];
+            [1,2,3,4].forEach(n=>{ const el=document.getElementById('modal-op'+n); if(el) el.value=ops[n-1]||''; });
+            document.getElementById('modal-correcta').value=p.respuesta_correcta;
+            document.getElementById('modal-exp').value=p.explicacion||'';
+            document.getElementById('modal-overlay').style.display='block';
+            document.body.style.overflow='hidden';
+        }
+        function cerrarModal(){
+            document.getElementById('modal-overlay').style.display='none';
+            document.body.style.overflow='';
+            modalId=null;
+        }
+        function guardarEdicion(){
+            if(!modalId) return;
+            const asig=normalizarEntrada(document.getElementById('modal-asig').value.trim(),EQUIV_ASIG);
+            const tema=normalizarEntrada(document.getElementById('modal-tema').value.trim(),EQUIV_TEMA);
+            const preg=document.getElementById('modal-preg').value.trim();
+            if(!asig||!tema||!preg){toast('Rellena asignatura, tema y pregunta','error');return;}
+            const ops=[1,2,3,4].map(n=>document.getElementById('modal-op'+n).value.trim()).filter(o=>o);
+            if(ops.length<2){toast('Añade al menos 2 opciones','error');return;}
+            const correcta=parseInt(document.getElementById('modal-correcta').value);
+            const exp=document.getElementById('modal-exp').value.trim();
+            // Update in bancoPreguntasGlobal
+            const gi=bancoPreguntasGlobal.findIndex(p=>p.id===modalId);
+            if(gi>=0){
+                bancoPreguntasGlobal[gi]={...bancoPreguntasGlobal[gi],asignatura:asig,tema:tema,pregunta:preg,opciones:ops,respuesta_correcta:correcta,explicacion:exp};
+            }
+            // If custom, also update localStorage
+            const ci=preguntasPersonalizadas.findIndex(p=>p.id===modalId);
+            if(ci>=0){
+                preguntasPersonalizadas[ci]={...preguntasPersonalizadas[ci],asignatura:asig,tema:tema,pregunta:preg,opciones:ops,respuesta_correcta:correcta,explicacion:exp};
+                localStorage.setItem('pir_preguntas_custom',JSON.stringify(preguntasPersonalizadas));
+            }
+            // Store edits for original questions too
+            const edits=JSON.parse(localStorage.getItem('pir_edits')||'{}');
+            edits[modalId]={asignatura:asig,tema:tema,pregunta:preg,opciones:ops,respuesta_correcta:correcta,explicacion:exp};
+            localStorage.setItem('pir_edits',JSON.stringify(edits));
+            cerrarModal();
+            toast('✅ Cambios guardados','ok');
+            actualizarDesplegableTemas();
+            renderBancoCompleto();
+            renderMisPreguntas();
+        }
+        function eliminarDeBanco(id){
+            if(!confirm('¿Eliminar esta pregunta? Si es del banco original, solo se elimina en este navegador.'))return;
+            const gi=bancoPreguntasGlobal.findIndex(p=>p.id===id);
+            if(gi>=0) bancoPreguntasGlobal.splice(gi,1);
+            const ci=preguntasPersonalizadas.findIndex(p=>p.id===id);
+            if(ci>=0){
+                preguntasPersonalizadas.splice(ci,1);
+                localStorage.setItem('pir_preguntas_custom',JSON.stringify(preguntasPersonalizadas));
+            }
+            const deleted=JSON.parse(localStorage.getItem('pir_deleted')||'[]');
+            if(!deleted.includes(id)){deleted.push(id);localStorage.setItem('pir_deleted',JSON.stringify(deleted));}
+            toast('Pregunta eliminada','ok');
+            actualizarDesplegableTemas();
+            renderBancoCompleto();
+            renderMisPreguntas();
+        }
+        function eliminarDesdeModal(){
+            if(!modalId) return;
+            const id=modalId;
+            cerrarModal();
+            eliminarDeBanco(id);
+        }
+
+        // ─── INICIAR TEST ────────────────────────────────────────────────
+        function iniciarTest(){
+            const asigs=getMulti('filtro-asignatura');
+            const temas=getMulti('filtro-tema');
+            const cantidad=document.getElementById('filtro-cantidad').value;
+            const modo=document.getElementById('filtro-modo').value;
+            modoRepasoFallos=asigs.includes('Fallos');
+            modoExamen=false;
+            modoCiegas=(modo==='ciegas');
+            preguntasActivas=filtrarPreguntas(asigs,temas,cantidad);
+            if(!preguntasActivas.length){
+                const msg=asigs.includes('Fallos')?'No tienes fallos guardados.':asigs.includes('Marcadas')?'No tienes preguntas marcadas.':'Sin preguntas para esta combinación.';
+                toast(msg,'error',3500);return;
+            }
+            toast('▶ Cargando '+preguntasActivas.length+' preguntas...','ok',1500);
+            arrancarTest(false);
+        }
+        // Distribución oficial PIR (210 preguntas)
+        const PIR_DIST = {
+            "Psicología Clínica":                             55,
+            "Tratamientos Adultos":                           45,
+            "Evaluación Psicológica":                         25,
+            "Psicobiología":                                  20,
+            "Psicología de la Personalidad y Diferencial":    20,
+            "Psicología Social":                              15,
+            "Psicología Evolutiva":                           15,
+            "Psicología Básica":                              10,
+            "Psicología Experimental":                         5,
+        };
+
+        function iniciarExamen(){
+            const modo=document.getElementById('examen-cantidad').value;
+            modoRepasoFallos=false;modoExamen=true;modoCiegas=false;
+
+            if(modo==='PIR'){
+                // Seleccionar preguntas con distribución real PIR
+                preguntasActivas=[];
+                const warnings=[];
+                for(const [asig,n] of Object.entries(PIR_DIST)){
+                    const pool=bancoPreguntasGlobal.filter(p=>p.asignatura===asig);
+                    barajar(pool);
+                    const sel=pool.slice(0,n);
+                    if(sel.length<n) warnings.push(`${asig}: solo ${sel.length}/${n}`);
+                    preguntasActivas.push(...sel);
+                }
+                barajar(preguntasActivas);
+                if(warnings.length) toast('⚠️ Pocas preguntas en: '+warnings.join(', '),'error',5000);
+                timerSegundos=270*60; // 4h 30min
+                arrancarTest(true);
+            } else {
+                const cantidad=parseInt(modo);
+                const minutos=parseInt(document.getElementById('examen-tiempo').value||'0');
+                preguntasActivas=filtrarPreguntas(['Todas'],['Todos'],cantidad);
+                if(!preguntasActivas.length){toast('Sin preguntas disponibles','error');return;}
+                timerSegundos=minutos*60;
+                arrancarTest(minutos>0);
+            }
+        }
+
+
+        // ─── PRACTICAR UNA PREGUNTA DESDE EL BUSCADOR ────────────────────
+
+        function actualizarContadorExamen(){
+            const modo=document.getElementById('examen-cantidad').value;
+            const infoEl=document.getElementById('info-banco-examen');
+            const distEl=document.getElementById('info-pir-dist');
+            const tiempoSel=document.getElementById('examen-tiempo');
+            const tiempoLbl=document.getElementById('lbl-tiempo-examen');
+
+            if(modo==='PIR'){
+                // Mostrar distribución PIR
+                let rows=[];
+                let total=0;
+                for(const [asig,n] of Object.entries(PIR_DIST)){
+                    const disponibles=bancoPreguntasGlobal.filter(p=>p.asignatura===asig).length;
+                    const ok=disponibles>=n;
+                    rows.push(`${ok?'✓':'⚠'} ${asig.replace('Psicología ','').replace('Tratamientos ','Ttos. ')}: ${n} (banco: ${disponibles})`);
+                    total+=n;
+                }
+                if(distEl) distEl.innerHTML=rows.join('<br>');
+                if(infoEl) infoEl.textContent='210 preguntas · 4h 30min · distribución PIR oficial';
+                if(tiempoSel) tiempoSel.style.display='none';
+                if(tiempoLbl) tiempoLbl.style.display='none';
+            } else {
+                if(distEl) distEl.innerHTML='';
+                const cant=parseInt(modo);
+                const total=bancoPreguntasGlobal.length;
+                const real=Math.min(cant,total);
+                if(infoEl) infoEl.textContent=real+' de '+total+' preguntas disponibles';
+                if(tiempoSel) tiempoSel.style.display='block';
+                if(tiempoLbl) tiempoLbl.style.display='block';
+            }
+        }
+        function practicarPregunta(id){
+            const p=bancoPreguntasGlobal.find(x=>x.id===id);
+            if(!p) return;
+            modoRepasoFallos=false; modoExamen=false; modoCiegas=false;
+            preguntasActivas=[p];
+            sesionAciertos=sesionFallos=sesionBlancos=0;
+            sesionResultados=[];pregMarcadaEnSesion=new Set();
+            rachaActual=0;rachaMáxima=0;indiceActual=0;
+            document.getElementById('penalizacion-info').style.display='none';
+            document.getElementById('btn-blanco').style.display='none';
+            document.getElementById('mini-blancos').style.display='none';
+            document.getElementById('racha-banner').style.display='none';
+            document.getElementById('badge-modo-test').innerHTML='<span class="badge-modo" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0">🔍 Búsqueda</span>';
+            if(timerInterval) clearInterval(timerInterval);
+            document.getElementById('temporizador-display').style.display='none';
+            mostrarPantalla('test');
+            cargarPregunta();
+        }
+
+
+        // ─── IMPORTAR JSON ───────────────────────────────────────────────
+        function importarJSON(event){
+            const file=event.target.files[0];
+            if(!file) return;
+            const reader=new FileReader();
+            reader.onload=function(e){
+                try{
+                    const data=JSON.parse(e.target.result);
+                    if(!Array.isArray(data)){
+                        toast('El JSON debe ser un array de preguntas','error',3500);
+                        return;
+                    }
+                    // Validar estructura
+                    const required=['id','asignatura','tema','pregunta','opciones','respuesta_correcta'];
+                    const invalid=data.filter(q=>!required.every(k=>k in q));
+                    if(invalid.length>0){
+                        toast(`${invalid.length} preguntas tienen campos faltantes`,'error',3500);
+                        return;
+                    }
+                    // Check duplicates
+                    const existing=new Set(bancoPreguntasGlobal.map(q=>q.id));
+                    const nuevas=data.filter(q=>!existing.has(q.id));
+                    const duplicadas=data.length-nuevas.length;
+                    
+                    if(nuevas.length===0){
+                        toast('Todas las preguntas ya existen en el banco','error',3500);
+                        return;
+                    }
+                    
+                    // Add to custom and global
+                    preguntasPersonalizadas.push(...nuevas);
+                    bancoPreguntasGlobal.push(...nuevas);
+                    localStorage.setItem('pir_preguntas_custom',JSON.stringify(preguntasPersonalizadas));
+                    
+                    actualizarDesplegableTemas();
+                    renderMisPreguntas();
+                    
+                    let msg=`✅ ${nuevas.length} pregunta${nuevas.length!==1?'s':''} importada${nuevas.length!==1?'s':''}`;
+                    if(duplicadas>0) msg+=` (${duplicadas} ya existía${duplicadas!==1?'n':''})`;
+                    toast(msg,'ok',4000);
+                    
+                    // Reset file input
+                    event.target.value='';
+                }catch(err){
+                    console.error(err);
+                    toast('Error al leer el JSON: '+err.message,'error',4000);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // ─── ARRANCAR TEST ───────────────────────────────────────────────
+        function arrancarTest(conTimer=false){
+            sesionAciertos=sesionFallos=sesionBlancos=0;
+            sesionResultados=[];pregMarcadaEnSesion=new Set();
+            rachaActual=0;rachaMáxima=0;
+            indiceActual=0;
+            document.getElementById('penalizacion-info').style.display=modoExamen?'block':'none';
+            document.getElementById('btn-blanco').style.display=modoExamen?'block':'none';
+            document.getElementById('mini-blancos').style.display=modoExamen?'inline':'none';
+            document.getElementById('racha-banner').style.display='none';
+            const badge=document.getElementById('badge-modo-test');
+            badge.innerHTML=modoExamen?'<span class="badge-modo badge-examen">🎓 Examen</span>':modoCiegas?'<span class="badge-modo badge-ciegas">🙈 Ciegas</span>':'';
+            if(timerInterval) clearInterval(timerInterval);
+            const timerEl=document.getElementById('temporizador-display');
+            if(conTimer&&timerSegundos>0){
+                timerEl.style.display='inline-block';timerEl.textContent=fTiempo(timerSegundos);
+                timerInterval=setInterval(()=>{timerSegundos--;timerEl.textContent=fTiempo(timerSegundos);timerEl.classList.toggle('urgente',timerSegundos<=60);if(timerSegundos<=0){clearInterval(timerInterval);mostrarResultados();}},1000);
+            } else timerEl.style.display='none';
+            mostrarPantalla('test');
+            cargarPregunta();
+        }
+
+        // ─── CARGAR PREGUNTA ─────────────────────────────────────────────
+        function cargarPregunta(){
+            const p=preguntasActivas[indiceActual];
+            let ops=p.opciones.map((txt,i)=>({txt,original:i+1}));
+            for(let i=ops.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ops[i],ops[j]]=[ops[j],ops[i]];}
+            const nuevaCorrecta=ops.findIndex(op=>op.original===p.respuesta_correcta)+1;
+            preguntaEnCurso={...p,correctaFisica:nuevaCorrecta};
+            let etiq=`${p.asignatura} — ${p.tema}`;
+            if(modoRepasoFallos) etiq='⚠️ '+etiq;
+            document.getElementById('etiqueta-tema').textContent=etiq;
+            document.getElementById('contador-preguntas').textContent=`Pregunta ${indiceActual+1} de ${preguntasActivas.length}`;
+            document.getElementById('texto-pregunta').textContent=p.pregunta;
+            const esMarcada=marcadasGuardadas.includes(p.id)||pregMarcadaEnSesion.has(p.id);
+            document.getElementById('btn-marcar-preg').className='btn-marcar '+(esMarcada?'marcado':'no-marcado');
+            window.scrollTo({top:0,behavior:'smooth'});
+            const cont=document.getElementById('contenedor-opciones');
+            cont.innerHTML='';
+            document.getElementById('area-explicacion').classList.remove('visible');
+            document.getElementById('btn-siguiente').style.display='none';
+            if(document.getElementById('btn-blanco')) document.getElementById('btn-blanco').disabled=false;
+            actualizarBarraProgreso();
+            ops.forEach((op,idx)=>{
+                const b=document.createElement('button');
+                b.className='btn-opcion';b.textContent=op.txt;
+                b.onclick=()=>comprobarRespuesta(idx+1,b);
+                cont.appendChild(b);
+            });
+            document.getElementById('btn-siguiente').textContent=indiceActual===preguntasActivas.length-1?'Ver resultados finales':'Siguiente Pregunta';
+        }
+
+        // ─── MARCADOR ────────────────────────────────────────────────────
+        function abrirModalTest(){
+            if(preguntaEnCurso) abrirModal(preguntaEnCurso.id);
+        }
+
+        function toggleMarcar(){
+            const id=preguntaEnCurso.id;
+            if(marcadasGuardadas.includes(id)){marcadasGuardadas=marcadasGuardadas.filter(x=>x!==id);pregMarcadaEnSesion.delete(id);}
+            else{marcadasGuardadas.push(id);pregMarcadaEnSesion.add(id);}
+            localStorage.setItem('pir_marcadas',JSON.stringify(marcadasGuardadas));
+            document.getElementById('btn-marcar-preg').className='btn-marcar '+(marcadasGuardadas.includes(id)?'marcado':'no-marcado');
+        }
+
+        // ─── DEJAR EN BLANCO ─────────────────────────────────────────────
+        function dejarEnBlanco(){
+            document.querySelectorAll('.btn-opcion').forEach(b=>b.disabled=true);
+            document.getElementById('btn-blanco').disabled=true;
+            sesionBlancos++;
+            rachaActual=0;
+            preguntasRespondidas.add(preguntaEnCurso.id);
+            localStorage.setItem('pir_respondidas',JSON.stringify([...preguntasRespondidas]));
+            sesionResultados.push({id:preguntaEnCurso.id,asignatura:preguntaEnCurso.asignatura,tema:preguntaEnCurso.tema,correcto:null,marcada:marcadasGuardadas.includes(preguntaEnCurso.id),respuestaFisica:null});
+            actualizarBarraProgreso();
+            document.querySelectorAll('.btn-opcion')[preguntaEnCurso.correctaFisica-1].classList.add('correcta');
+            if(!modoCiegas){document.getElementById('texto-explicacion').textContent=preguntaEnCurso.explicacion;document.getElementById('area-explicacion').classList.add('visible');}
+            document.getElementById('btn-siguiente').style.display='block';
+            actualizarRachaBanner();
+        }
+
+        // ─── COMPROBAR RESPUESTA ─────────────────────────────────────────
+        function comprobarRespuesta(seleccion,botonClicado){
+            const bots=document.querySelectorAll('.btn-opcion');
+            bots.forEach(b=>b.disabled=true);
+            if(document.getElementById('btn-blanco')) document.getElementById('btn-blanco').disabled=true;
+            const ok=(seleccion===preguntaEnCurso.correctaFisica);
+            const id=preguntaEnCurso.id;
+            const ahora=Date.now();
+            if(ok){
+                sesionAciertos++;rachaActual++;if(rachaActual>rachaMáxima)rachaMáxima=rachaActual;
+                botonClicado.classList.add('correcta');
+                if(modoRepasoFallos){fallosGuardados=fallosGuardados.filter(f=>f!==id);localStorage.setItem('pir_fallos',JSON.stringify(fallosGuardados));}
+                if(historialSpaced[id]) historialSpaced[id]=ahora+(3*24*60*60*1000);
+                // Stats globales
+                if(!statsGlobales[preguntaEnCurso.asignatura]) statsGlobales[preguntaEnCurso.asignatura]={ok:0,ko:0};
+                statsGlobales[preguntaEnCurso.asignatura].ok++;
+            } else {
+                sesionFallos++;rachaActual=0;
+                botonClicado.classList.add('incorrecta');
+                bots[preguntaEnCurso.correctaFisica-1].classList.add('correcta');
+                if(!fallosGuardados.includes(id)){fallosGuardados.push(id);localStorage.setItem('pir_fallos',JSON.stringify(fallosGuardados));}
+                historialSpaced[id]=ahora+(1*60*60*1000);
+                if(!statsGlobales[preguntaEnCurso.asignatura]) statsGlobales[preguntaEnCurso.asignatura]={ok:0,ko:0};
+                statsGlobales[preguntaEnCurso.asignatura].ko++;
+            }
+            localStorage.setItem('pir_spaced_rep',JSON.stringify(historialSpaced));
+            localStorage.setItem('pir_stats',JSON.stringify(statsGlobales));
+            preguntasRespondidas.add(id);
+            localStorage.setItem('pir_respondidas',JSON.stringify([...preguntasRespondidas]));
+            sesionResultados.push({id,asignatura:preguntaEnCurso.asignatura,tema:preguntaEnCurso.tema,correcto:ok,marcada:marcadasGuardadas.includes(id),respuestaFisica:seleccion});
+            actualizarBarraProgreso();
+            actualizarRachaBanner();
+            if(!modoCiegas){document.getElementById('texto-explicacion').textContent=preguntaEnCurso.explicacion;document.getElementById('area-explicacion').classList.add('visible');}
+            document.getElementById('btn-siguiente').style.display='block';
+        }
+
+        // ─── RACHA ───────────────────────────────────────────────────────
+        function actualizarRachaBanner(){
+            const banner=document.getElementById('racha-banner');
+            if(rachaActual>=3){
+                banner.textContent=`🔥 ¡Racha de ${rachaActual} aciertos seguidos!`;
+                banner.style.display='block';
+            } else {
+                banner.style.display='none';
+            }
+        }
+
+        // ─── BARRA PROGRESO ──────────────────────────────────────────────
+        function actualizarBarraProgreso(){
+            const resp=sesionAciertos+sesionFallos+sesionBlancos;
+            const pct=preguntasActivas.length>0?(resp/preguntasActivas.length)*100:0;
+            document.getElementById('barra-fill').style.width=pct+'%';
+            document.getElementById('mini-aciertos').textContent=`✓ ${sesionAciertos} acierto${sesionAciertos!==1?'s':''}`;
+            document.getElementById('mini-fallos-test').textContent=`✗ ${sesionFallos} fallo${sesionFallos!==1?'s':''}`;
+            document.getElementById('mini-blancos').textContent=`— ${sesionBlancos} en blanco`;
+        }
+
+        function siguientePregunta(){
+            if(indiceActual<preguntasActivas.length-1){indiceActual++;cargarPregunta();}
+            else{if(timerInterval)clearInterval(timerInterval);mostrarResultados();}
+        }
+
+        // ─── SALIR DEL TEST ──────────────────────────────────────────────
+        function confirmarSalir(){
+            const resp=sesionAciertos+sesionFallos+sesionBlancos;
+            const msg=resp>0
+                ? '¿Salir? Llevas '+resp+' pregunta'+(resp!==1?'s':'')+' respondida'+(resp!==1?'s':'')+'. Se perderá el progreso.'
+                : '¿Salir del test?';
+            if(confirm(msg)){
+                if(timerInterval)clearInterval(timerInterval);
+                mostrarPantalla('config');
+                actualizarDesplegableTemas();
+            }
+        }
+
+        // ─── RESULTADOS ──────────────────────────────────────────────────
+        function mostrarResultados(){
+            const total=sesionAciertos+sesionFallos+sesionBlancos;
+            const resp=sesionAciertos+sesionFallos;
+            const pct=resp>0?Math.round((sesionAciertos/resp)*100):0;
+            const c=clase(pct);
+            const labels={excelente:'¡Excelente!',bien:'Bien',mejorar:'A mejorar',mal:'Sigue practicando'};
+            const scorePIR=sesionAciertos-sesionFallos*0.25;
+            const sesion={ts:Date.now(),modo:modoExamen?'Examen':modoCiegas?'Ciegas':'Repaso',aciertos:sesionAciertos,fallos:sesionFallos,blancos:sesionBlancos,total,pct,scorePIR:modoExamen?scorePIR:null,resultados:sesionResultados,rachaMáx:rachaMáxima};
+            historialSesiones.unshift(sesion);
+            if(historialSesiones.length>50)historialSesiones.pop();
+            localStorage.setItem('pir_historial',JSON.stringify(historialSesiones));
+            document.getElementById('circulo-resultado').className=`resultado-circulo ${c}`;
+            document.getElementById('pct-resultado').textContent=pct+'%';
+            document.getElementById('lbl-resultado').textContent=labels[c];
+            document.getElementById('res-aciertos').textContent=sesionAciertos;
+            document.getElementById('res-fallos').textContent=sesionFallos;
+            document.getElementById('res-total').textContent=total;
+            document.getElementById('lbl-subtitulo-resultado').textContent=modoExamen?'Examen simulado PIR':modoCiegas?'Modo a ciegas':modoRepasoFallos?'Repaso de fallos':`${total} pregunta${total!==1?'s':''} respondida${total!==1?'s':''}`;
+            const showBlancos=sesionBlancos>0;
+            document.getElementById('res-blancos').textContent=sesionBlancos;
+            document.getElementById('res-blancos').style.display=showBlancos?'block':'none';
+            document.getElementById('lbl-blancos').style.display=showBlancos?'block':'none';
+            const scoreWrap=document.getElementById('score-pir-wrap');
+            if(modoExamen){scoreWrap.style.display='block';document.getElementById('score-pir-num').textContent=scorePIR.toFixed(2);}else scoreWrap.style.display='none';
+            // Racha máxima
+            const rachaWrap=document.getElementById('racha-resultado-wrap');
+            if(rachaMáxima>=3){
+                rachaWrap.style.display='block';
+                document.getElementById('racha-resultado-badge').textContent=`🔥 Racha máxima: ${rachaMáxima} aciertos seguidos`;
+                document.getElementById('racha-resultado-badge').style.display='inline-block';
+            } else rachaWrap.style.display='none';
+            // Desglose
+            const porAsig={};
+            sesionResultados.forEach(r=>{
+                if(!porAsig[r.asignatura])porAsig[r.asignatura]={};
+                if(!porAsig[r.asignatura][r.tema])porAsig[r.asignatura][r.tema]={ok:0,ko:0,bl:0};
+                if(r.correcto===true)porAsig[r.asignatura][r.tema].ok++;
+                else if(r.correcto===false)porAsig[r.asignatura][r.tema].ko++;
+                else porAsig[r.asignatura][r.tema].bl++;
+            });
+            const cont=document.getElementById('desglose-asignaturas');cont.innerHTML='';
+            Object.entries(porAsig).forEach(([asig,temas],idx)=>{
+                const tOk=Object.values(temas).reduce((a,t)=>a+t.ok,0);
+                const tKo=Object.values(temas).reduce((a,t)=>a+t.ko,0);
+                const tBl=Object.values(temas).reduce((a,t)=>a+t.bl,0);
+                const pA=tOk+tKo>0?Math.round((tOk/(tOk+tKo))*100):0;
+                const cA=clase(pA);const uid=`tres_${idx}`;
+                const div=document.createElement('div');div.className='fila-asignatura';
+                div.innerHTML=`<div class="fila-asignatura-header"><span class="asig-nombre">${asig}</span><span class="asig-pct" style="color:var(--${cvar(cA)})">${pA}%</span></div><div class="mini-barra-pista"><div class="mini-barra-fill fill-${cA}" style="width:${pA}%"></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px"><span class="asig-detalle"><span class="tag-ok">✓ ${tOk}</span> &nbsp;<span class="tag-ko">✗ ${tKo}</span>${tBl>0?` &nbsp;— ${tBl}`:''} &nbsp;de ${tOk+tKo+tBl}</span><button class="btn-desplegar-temas" onclick="toggleTablaResultados('${uid}')">por temas ▾</button></div><div class="tabla-temas" id="${uid}">${Object.entries(temas).map(([t,st])=>{const pT=(st.ok+st.ko)>0?Math.round((st.ok/(st.ok+st.ko))*100):0;const cT=clase(pT);return`<div class="fila-tema"><span class="tema-nombre">${t}</span><span class="tema-stats"><span class="tag-ok">✓${st.ok}</span><span class="tag-ko">✗${st.ko}</span>${st.bl>0?`<span>—${st.bl}</span>`:''}<strong style="color:var(--${cvar(cT)})">${pT}%</strong></span></div>`;}).join('')}</div>`;
+                cont.appendChild(div);
+            });
+            const marcadasSes=sesionResultados.filter(r=>r.marcada||pregMarcadaEnSesion.has(r.id));
+            const secM=document.getElementById('seccion-marcadas-res');
+            if(marcadasSes.length){
+                secM.style.display='block';
+                document.getElementById('lista-marcadas-res').innerHTML=marcadasSes.map(r=>{const p=bancoPreguntasGlobal.find(x=>x.id===r.id);return`<div class="fila-tema" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-weight:600;font-size:0.85em">${p?p.pregunta.substring(0,80)+'…':r.id}</span><span class="bi-asig">${r.asignatura} — ${r.tema}</span></div>`;}).join('');
+            } else secM.style.display='none';
+            mostrarPantalla('resultados');
+        }
+        function toggleTablaResultados(uid){document.getElementById(uid).classList.toggle('visible');}
+
+        // ─── HISTORIAL ───────────────────────────────────────────────────
+        function renderHistorial(){
+            const cont=document.getElementById('contenido-historial');
+            if(!historialSesiones.length){cont.innerHTML='<div class="no-historial">Aún no hay sesiones guardadas.<br>Completa un test para verlas aquí.</div>';return;}
+            cont.innerHTML=historialSesiones.map(s=>{
+                const c=clase(s.pct);
+                return`<div class="sesion-item"><div><div class="sesion-fecha">${fFecha(s.ts)} · ${s.modo}</div><div style="margin-top:3px"><span class="tag-ok">✓${s.aciertos}</span> &nbsp;<span class="tag-ko">✗${s.fallos}</span>${s.blancos>0?` &nbsp;—${s.blancos}`:''} &nbsp;<span style="font-size:0.82em;color:var(--text-muted)">${s.total} pregs</span>${s.scorePIR!=null?`<span class="sesion-detalle"> · PIR: ${s.scorePIR.toFixed(2)}</span>`:''} ${s.rachaMáx>=3?`<span style="color:#d97706;font-size:0.78em">🔥 racha ${s.rachaMáx}</span>`:''}</div></div><div class="sesion-nota" style="color:var(--${cvar(c)})">${s.pct}%</div></div>`;
+            }).join('');
+            // Mini gráfica de evolución (últimas 10 sesiones)
+            const ultimas=[...historialSesiones].reverse().slice(-10);
+            if(ultimas.length>=2){
+                const W=340,H=60,pad=12;
+                const pts=ultimas.map((s,i)=>({x:pad+(i/(ultimas.length-1))*(W-2*pad),y:H-pad-(s.pct/100)*(H-2*pad)}));
+                const polyline=pts.map(p=>`${p.x},${p.y}`).join(' ');
+                const dots=pts.map((p,i)=>`<circle cx="${p.x}" cy="${p.y}" r="3" fill="${cvar(clase(ultimas[i].pct))==='success'?'#10b981':cvar(clase(ultimas[i].pct))==='error'?'#ef4444':'#2563eb'}"/>`).join('');
+                cont.innerHTML=`<div class="grafica-wrap"><div class="grafica-titulo">Evolución (últimas ${ultimas.length} sesiones)</div><div class="grafica-svg-wrap"><svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block"><polyline points="${polyline}" fill="none" stroke="#2563eb" stroke-width="2"/>${dots}</svg></div></div>`+cont.innerHTML;
+            }
+        }
+        function borrarHistorial(){if(confirm('¿Borrar todo el historial de sesiones?')){historialSesiones=[];localStorage.removeItem('pir_historial');renderHistorial();}}
+
+        // ─── STATS GLOBALES ──────────────────────────────────────────────
+        function renderStatsGlobales(){
+            const cont=document.getElementById('contenido-stats-globales');
+            const totalOk=Object.values(statsGlobales).reduce((a,s)=>a+s.ok,0);
+            const totalKo=Object.values(statsGlobales).reduce((a,s)=>a+s.ko,0);
+            const totalResp=totalOk+totalKo;
+            const pctGlobal=totalResp>0?Math.round((totalOk/totalResp)*100):0;
+            const cG=clase(pctGlobal);
+            if(!totalResp){cont.innerHTML='<div class="no-historial">Aún no hay datos acumulados.<br>Completa tests para ver tus estadísticas globales aquí.</div>';return;}
+            cont.innerHTML=`
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="sc-num" style="color:var(--${cvar(cG)})">${pctGlobal}%</div><div class="sc-lbl">Acierto global</div></div>
+                    <div class="stat-card"><div class="sc-num">${totalResp}</div><div class="sc-lbl">Preguntas respondidas</div></div>
+                    <div class="stat-card ok"><div class="sc-num">${totalOk}</div><div class="sc-lbl">Aciertos totales</div></div>
+                    <div class="stat-card ko"><div class="sc-num">${totalKo}</div><div class="sc-lbl">Fallos totales</div></div>
+                </div>
+                <div class="resultado-seccion">
+                    <h3>Por asignatura (acumulado)</h3>
+                    <div class="stats-asig-tabla">
+                        ${Object.entries(statsGlobales).sort((a,b)=>{const pa=a[1].ok+a[1].ko>0?a[1].ok/(a[1].ok+a[1].ko):0;const pb=b[1].ok+b[1].ko>0?b[1].ok/(b[1].ok+b[1].ko):0;return pa-pb;}).map(([asig,s])=>{
+                            const tot=s.ok+s.ko;const p=tot>0?Math.round((s.ok/tot)*100):0;const c=clase(p);
+                            return`<div class="stats-asig-fila">
+                                <span class="stats-asig-nombre">${asig}</span>
+                                <div class="stats-asig-barra-wrap"><div class="stats-asig-barra-fill fill-${c}" style="width:${p}%"></div></div>
+                                <span style="font-size:0.78em;color:var(--text-muted);white-space:nowrap">${s.ok}/${tot}</span>
+                                <span style="font-weight:700;font-size:0.85em;color:var(--${cvar(c)});margin-left:8px;min-width:34px;text-align:right">${p}%</span>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+                <button class="btn-secundario" onclick="borrarStatsGlobales()" style="margin-top:4px">Borrar estadísticas globales</button>`;
+        }
+        function borrarStatsGlobales(){if(confirm('¿Borrar todas las estadísticas globales acumuladas?')){statsGlobales={};localStorage.removeItem('pir_stats');renderStatsGlobales();}}
+
+        // ─── BUSCADOR ────────────────────────────────────────────────────
+        function buscarPreguntas(){
+            const q=document.getElementById('input-buscador').value.trim();
+            const cont=document.getElementById('resultados-busqueda');
+            if(q.length<2){cont.innerHTML='';return;}
+            const re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+            const hits=bancoPreguntasGlobal.filter(p=>p.pregunta.match(re)||p.asignatura.match(re)||p.tema.match(re)||p.opciones.some(o=>o.match(re))).slice(0,40);
+            if(!hits.length){cont.innerHTML='<div class="buscador-vacio">Sin resultados</div>';return;}
+            cont.innerHTML=`<div class="buscador-resultados">${hits.map(p=>{const hl=t=>t.replace(re,m=>`<span class="buscador-resaltado">${m}</span>`);return`<div class="buscador-item" onclick="practicarPregunta('${p.id}')" title="Clic para practicar"><div>${hl(p.pregunta.substring(0,120))}${p.pregunta.length>120?'…':''}</div><div class="bi-asig">${p.asignatura} · ${p.tema}</div><div style="font-size:0.75em;color:var(--primary);margin-top:2px">▶ Practicar esta pregunta</div></div>`;}).join('')}</div>`;
+        }
+
+        // ─── EXPORTAR ────────────────────────────────────────────────────
+        function exportarResultados(){
+            const total=sesionAciertos+sesionFallos+sesionBlancos;
+            const pct=(sesionAciertos+sesionFallos)>0?Math.round(sesionAciertos/(sesionAciertos+sesionFallos)*100):0;
+            let txt=`RESULTADOS PIR - ${new Date().toLocaleString('es-ES')}\n${'='.repeat(50)}\nAciertos: ${sesionAciertos} | Fallos: ${sesionFallos} | En blanco: ${sesionBlancos} | Total: ${total}\n%: ${pct}% | Score PIR: ${(sesionAciertos-sesionFallos*0.25).toFixed(2)} | Racha máx: ${rachaMáxima}\n\nDETALLE\n${'-'.repeat(50)}\n`;
+            sesionResultados.forEach((r,i)=>{const p=bancoPreguntasGlobal.find(x=>x.id===r.id);const res=r.correcto===null?'—BLANCO':r.correcto?'✓':'✗';txt+=`\n${i+1}. [${res}] ${p?p.pregunta:r.id}\n   ${r.asignatura} · ${r.tema}\n`;if(p&&!r.correcto&&r.correcto!==null)txt+=`   Correcta: ${p.opciones[p.respuesta_correcta-1]}\n`;});
+            const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));a.download=`resultados_pir_${Date.now()}.txt`;a.click();
+        }
+
+        // ─── UTILS ───────────────────────────────────────────────────────
+        function volverAlInicio(){mostrarPantalla('config');actualizarDesplegableTemas();}
+        function borrarHistorialFallos(){if(confirm('¿Borrar todos los fallos guardados?')){fallosGuardados=[];localStorage.removeItem('pir_fallos');toast('🗑 Historial de fallos borrado');actualizarDesplegableTemas();}}
+        function borrarRespondidas(){if(confirm('¿Marcar todas las preguntas como no hechas? Esto no borra tus fallos ni tu historial.')){preguntasRespondidas.clear();localStorage.removeItem('pir_respondidas');actualizarDesplegableTemas();toast('✅ Todas las preguntas marcadas como no hechas');}}
+
+        // ─── INIT ────────────────────────────────────────────────────────
+        // Aplicar ediciones y eliminaciones guardadas al banco
+        (function aplicarCambiosGuardados(){
+            const edits=JSON.parse(localStorage.getItem('pir_edits')||'{}');
+            const deleted=JSON.parse(localStorage.getItem('pir_deleted')||'[]');
+            for(let i=bancoPreguntasGlobal.length-1;i>=0;i--){
+                const p=bancoPreguntasGlobal[i];
+                if(deleted.includes(p.id)){bancoPreguntasGlobal.splice(i,1);continue;}
+                if(edits[p.id]) Object.assign(bancoPreguntasGlobal[i],edits[p.id]);
+            }
+        })();
+
+        document.addEventListener('DOMContentLoaded',()=>{
+            inicializarSelectorAsig();
+            // Añadir asignaturas custom al selector
+            const selFiltro=document.getElementById('filtro-asignatura');
+            const asigCustom=[...new Set(preguntasPersonalizadas.map(p=>p.asignatura))];
+            asigCustom.forEach(a=>{
+                const yaExiste=[...selFiltro.options].some(o=>norm(o.value)===norm(a));
+                if(!yaExiste){const o=document.createElement('option');o.value=a;o.textContent=a;selFiltro.appendChild(o);}
+            });
+            // Restaurar últimos filtros usados
+            const lf=JSON.parse(localStorage.getItem('pir_lastfilters')||'null');
+            if(lf){
+                try{
+                    [...selFiltro.options].forEach(o=>{ o.selected=lf.asigs&&lf.asigs.includes(o.value); });
+                    const selC=document.getElementById('filtro-cantidad');
+                    if(lf.cantidad) selC.value=lf.cantidad;
+                    const selM=document.getElementById('filtro-modo');
+                    if(lf.modo) selM.value=lf.modo;
+                }catch(e){}
+            }
+            actualizarDesplegableTemas();
+            // Restaurar selección de temas tras poblar el select
+            if(lf&&lf.temas){
+                try{
+                    const selT=document.getElementById('filtro-tema');
+                    [...selT.options].forEach(o=>{ o.selected=lf.temas.includes(o.value); });
+                }catch(e){}
+            }
+            document.title='Preparación PIR';
+        });
+    </script>
+</body>
+</html>
