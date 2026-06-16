@@ -121,6 +121,12 @@
         .penalizacion-info { font-size: 0.78em; color: var(--text-muted); background: #fef9c3; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 12px; margin-bottom: 12px; text-align: center; }
         .btn-dejar-blanco { background: transparent; border: 1px dashed var(--text-muted); color: var(--text-muted); padding: 10px; border-radius: 8px; font-size: 0.88em; cursor: pointer; width: 100%; margin-top: 10px; }
         .btn-dejar-blanco:hover { background: #f1f5f9; }
+        .btn-saltar { background: transparent; border: 1px dashed #f59e0b; color: #b45309; padding: 10px; border-radius: 8px; font-size: 0.88em; cursor: pointer; width: 100%; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-saltar:hover { background: #fffbeb; }
+        .btn-saltar:disabled { opacity: 0.4; cursor: not-allowed; }
+        .saltadas-badge { display: inline-flex; align-items: center; gap: 5px; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; border-radius: 20px; padding: 3px 10px; font-size: 0.78em; font-weight: 700; margin-left: 8px; }
+        .modo-repaso-saltadas { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 10px 14px; font-size: 0.85em; color: #92400e; font-weight: 600; margin-bottom: 12px; display: none; text-align: center; }
+        .modo-repaso-saltadas.visible { display: block; }
 
         /* === MARCADOR === */
         .btn-marcar { background: none; border: none; font-size: 1.1em; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: transform 0.1s; line-height: 1; }
@@ -184,6 +190,37 @@
         .grafica-wrap { margin:16px 0 8px; }
         .grafica-titulo { font-size:0.8em; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
         .grafica-svg-wrap { width:100%; overflow:hidden; border-radius:6px; border:1px solid var(--border); background:#f8fafc; }
+
+        /* === ANIMACIÓN GUARDADO PREGUNTA === */
+        @keyframes guardadoFlash {
+            0%   { transform: scale(1); background-color: #10b981; }
+            30%  { transform: scale(1.04); background-color: #059669; }
+            100% { transform: scale(1); background-color: #10b981; }
+        }
+        .btn-guardado-ok {
+            animation: guardadoFlash 0.5s ease;
+        }
+        #anki-exito-msg {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            background: #d1fae5;
+            border: 1px solid #6ee7b7;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 14px;
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #065f46;
+            animation: aparecer 0.35s ease;
+        }
+        #anki-exito-msg.visible {
+            display: flex;
+        }
+        #anki-exito-msg .exito-icono {
+            font-size: 1.4em;
+            flex-shrink: 0;
+        }
 
         /* === GESTIÓN PREGUNTAS CUSTOM === */
         .custom-q-item { background:var(--bg-color); border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:0.83em; display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
@@ -488,7 +525,11 @@
                     <span class="etiqueta-filtro">Explicación (Opcional)</span>
                     <textarea id="anki-exp" rows="2" placeholder="Por qué esta es la respuesta correcta..."></textarea>
 
-                    <button class="btn-principal" onclick="guardarPreguntaAnki()" style="background:#10b981">💾 Guardar Pregunta</button>
+                    <div id="anki-exito-msg">
+                        <span class="exito-icono">✅</span>
+                        <span id="anki-exito-texto">¡Pregunta guardada correctamente!</span>
+                    </div>
+                    <button class="btn-principal" id="btn-guardar-anki" onclick="guardarPreguntaAnki()" style="background:#10b981">💾 Guardar Pregunta</button>
                 </div>
 
                 <div id="subtab-mias" style="display:none">
@@ -530,15 +571,17 @@
             <div id="penalizacion-info" class="penalizacion-info" style="display:none">
                 ⚖️ Modo examen: <strong>+1</strong> acierto · <strong>-0.25</strong> fallo · <strong>0</strong> en blanco
             </div>
+            <div class="modo-repaso-saltadas" id="banner-saltadas"></div>
             <div class="pregunta-texto" id="texto-pregunta"></div>
             <div class="opciones" id="contenedor-opciones"></div>
             <button class="btn-dejar-blanco" id="btn-blanco" onclick="dejarEnBlanco()" style="display:none">— Dejar en blanco</button>
+            <button class="btn-saltar" id="btn-saltar" onclick="saltarPregunta()">⏭ Saltar (volver después) <span id="badge-saltadas" style="display:none" class="saltadas-badge">0 pendientes</span></button>
             <div class="feedback-area" id="area-explicacion">
                 <strong>Explicación:</strong>
                 <p id="texto-explicacion"></p>
             </div>
             <button class="btn-principal" id="btn-siguiente" onclick="siguientePregunta()">Siguiente Pregunta</button>
-            <div class="teclas-hint" id="teclas-hint">⌨️ Teclas: <kbd>1-4</kbd> responder · <kbd>Espacio/→</kbd> siguiente · <kbd>M</kbd> marcar · <kbd>N</kbd> noche · <kbd>Esc</kbd> salir</div>
+            <div class="teclas-hint" id="teclas-hint">⌨️ Teclas: <kbd>1-4</kbd> responder · <kbd>Espacio/→</kbd> siguiente · <kbd>S</kbd> saltar · <kbd>M</kbd> marcar · <kbd>N</kbd> noche · <kbd>Esc</kbd> salir</div>
             <button class="btn-salir-test" onclick="confirmarSalir()">↩ Salir del test</button>
         </div>
 
@@ -668,6 +711,9 @@
         let rachaMáxima          = 0;
         let timerInterval        = null;
         let timerSegundos        = 0;
+        // ─── SALTAR PREGUNTAS ─────────────────────────────────────────────
+        let preguntasSaltadas    = [];   // índices del array preguntasActivas
+        let modoRepasoSaltadas   = false; // true cuando estamos en la ronda de saltadas
 
         // ─── UTILIDADES ────────────────────────────────────────────────
         const norm  = t => t.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -717,6 +763,9 @@
                     siguiente.click();
                 } else if(e.key==='m'||e.key==='M'){
                     toggleMarcar();
+                } else if((e.key==='s'||e.key==='S')&&!respondida&&!modoRepasoSaltadas){
+                    e.preventDefault();
+                    saltarPregunta();
                 } else if(e.key==='Escape'){
                     confirmarSalir();
                 }
@@ -1522,18 +1571,33 @@
             localStorage.setItem('pir_preguntas_custom',JSON.stringify(preguntasPersonalizadas));
             bancoPreguntasGlobal.push(nq);
 
-            // Si la asignatura es nueva, añadirla al selector principal de filtros
-            const selFiltro=document.getElementById('filtro-asignatura');
-            const yaExiste=[...selFiltro.options].some(o=>norm(o.value)===norm(asig));
-            if(!yaExiste){
-                const o=document.createElement('option');
-                o.value=asig;o.textContent=asig;
-                selFiltro.appendChild(o);
-            }
+            const esNuevaAsig = ![...document.getElementById('asig-btns-grid').querySelectorAll('.asig-btn')].some(b=>norm(b.dataset.val)===norm(asig));
+
+            // Si la asignatura es nueva, añadirla al grid de botones
+            añadirBtnAsigCustom(asig);
+
+            // Limpiar formulario
             ['anki-asig','anki-tema','anki-preg','anki-op1','anki-op2','anki-op3','anki-op4','anki-exp'].forEach(id=>document.getElementById(id).value='');
             document.getElementById('anki-asig-sel').value='';
             document.getElementById('anki-tema-sel').value='';
-            toast(`✅ Guardada en "${asig}" · ${tema}`, 'ok');
+            document.getElementById('anki-correcta').value='1';
+
+            // Mostrar mensaje de éxito con animación
+            const exitoMsg=document.getElementById('anki-exito-msg');
+            const exitoTxt=document.getElementById('anki-exito-texto');
+            exitoTxt.textContent = esNuevaAsig
+                ? `¡Guardada! Nueva asignatura "${asig}" añadida al selector.`
+                : `¡Guardada en "${asig}" · ${tema}"!`;
+            exitoMsg.classList.add('visible');
+            const btn=document.getElementById('btn-guardar-anki');
+            btn.classList.add('btn-guardado-ok');
+            btn.textContent='✅ ¡Pregunta guardada!';
+            setTimeout(()=>{
+                exitoMsg.classList.remove('visible');
+                btn.classList.remove('btn-guardado-ok');
+                btn.textContent='💾 Guardar Pregunta';
+            }, 2800);
+
             actualizarDesplegableTemas();
             rellenarSelectsAnki();
         }
@@ -1859,6 +1923,10 @@
             sesionResultados=[];pregMarcadaEnSesion=new Set();
             rachaActual=0;rachaMáxima=0;
             indiceActual=0;
+            preguntasSaltadas=[];modoRepasoSaltadas=false;
+            document.getElementById('banner-saltadas').classList.remove('visible');
+            document.getElementById('badge-saltadas').style.display='none';
+            document.getElementById('btn-saltar').disabled=false;
             document.getElementById('penalizacion-info').style.display=modoExamen?'block':'none';
             document.getElementById('btn-blanco').style.display=modoExamen?'block':'none';
             document.getElementById('mini-blancos').style.display=modoExamen?'inline':'none';
@@ -1884,8 +1952,11 @@
             preguntaEnCurso={...p,correctaFisica:nuevaCorrecta};
             let etiq=`${p.asignatura} — ${p.tema}`;
             if(modoRepasoFallos) etiq='⚠️ '+etiq;
+            if(modoRepasoSaltadas) etiq='🔄 (Saltada) ' + etiq;
             document.getElementById('etiqueta-tema').textContent=etiq;
-            document.getElementById('contador-preguntas').textContent=`Pregunta ${indiceActual+1} de ${preguntasActivas.length}`;
+            // Contador: muestra la posición real entre el total
+            const respondidas=sesionResultados.length;
+            document.getElementById('contador-preguntas').textContent=`Pregunta ${respondidas+1} de ${preguntasActivas.length}`;
             document.getElementById('texto-pregunta').textContent=p.pregunta;
             const esMarcada=marcadasGuardadas.includes(p.id)||pregMarcadaEnSesion.has(p.id);
             document.getElementById('btn-marcar-preg').className='btn-marcar '+(esMarcada?'marcado':'no-marcado');
@@ -1895,6 +1966,10 @@
             document.getElementById('area-explicacion').classList.remove('visible');
             document.getElementById('btn-siguiente').style.display='none';
             if(document.getElementById('btn-blanco')) document.getElementById('btn-blanco').disabled=false;
+            // Saltar: desactivar en ronda de repaso
+            const btnSaltar=document.getElementById('btn-saltar');
+            btnSaltar.disabled=modoRepasoSaltadas;
+            btnSaltar.title=modoRepasoSaltadas?'En la ronda de repaso no se puede volver a saltar':'Saltar y volver después';
             actualizarBarraProgreso();
             ops.forEach((op,idx)=>{
                 const b=document.createElement('button');
@@ -1902,7 +1977,19 @@
                 b.onclick=()=>comprobarRespuesta(idx+1,b);
                 cont.appendChild(b);
             });
-            document.getElementById('btn-siguiente').textContent=indiceActual===preguntasActivas.length-1?'Ver resultados finales':'Siguiente Pregunta';
+            // Texto del botón siguiente
+            const quedanSaltadas=preguntasSaltadas.length;
+            const esUltimaRespondible=modoRepasoSaltadas ? quedanSaltadas===0 : (()=>{
+                const total=preguntasActivas.length;
+                let hayMas=false;
+                for(let i=indiceActual+1;i<total;i++){
+                    const yaResp=sesionResultados.some(r=>r.id===preguntasActivas[i].id);
+                    const saltada=preguntasSaltadas.includes(i);
+                    if(!yaResp&&!saltada){hayMas=true;break;}
+                }
+                return !hayMas && quedanSaltadas===0;
+            })();
+            document.getElementById('btn-siguiente').textContent=esUltimaRespondible?'Ver resultados finales':quedanSaltadas>0&&!modoRepasoSaltadas?'Siguiente Pregunta':'Siguiente Pregunta';
         }
 
         // ─── MARCADOR ────────────────────────────────────────────────────
@@ -1918,10 +2005,60 @@
             document.getElementById('btn-marcar-preg').className='btn-marcar '+(marcadasGuardadas.includes(id)?'marcado':'no-marcado');
         }
 
+        // ─── SALTAR PREGUNTA ─────────────────────────────────────────────
+        function saltarPregunta(){
+            if(modoRepasoSaltadas) return; // en ronda de repaso no se puede volver a saltar
+            if(!preguntasSaltadas.includes(indiceActual)){
+                preguntasSaltadas.push(indiceActual);
+            }
+            // Actualizar badge
+            const badge=document.getElementById('badge-saltadas');
+            badge.textContent=`${preguntasSaltadas.length} pendiente${preguntasSaltadas.length!==1?'s':''}`;
+            badge.style.display='inline-flex';
+            // Avanzar a la siguiente no saltada ni respondida
+            const total=preguntasActivas.length;
+            let siguiente=-1;
+            for(let i=1;i<=total;i++){
+                const idx=(indiceActual+i)%total;
+                const yaRespondida=sesionResultados.some(r=>r.id===preguntasActivas[idx].id);
+                const esSaltada=preguntasSaltadas.includes(idx);
+                if(!yaRespondida&&!esSaltada){siguiente=idx;break;}
+            }
+            if(siguiente!==-1){
+                indiceActual=siguiente;
+                cargarPregunta();
+            } else {
+                // Solo quedan saltadas — iniciar ronda de repaso
+                iniciarRepasoSaltadas();
+            }
+        }
+
+        function iniciarRepasoSaltadas(){
+            modoRepasoSaltadas=true;
+            document.getElementById('btn-saltar').disabled=true;
+            const banner=document.getElementById('banner-saltadas');
+            banner.textContent=`🔄 Ronda de repaso: ${preguntasSaltadas.length} pregunta${preguntasSaltadas.length!==1?'s saltadas':'saltada'} pendiente${preguntasSaltadas.length!==1?'s':''}`;
+            banner.classList.add('visible');
+            indiceActual=preguntasSaltadas.shift();
+            cargarPregunta();
+        }
+
+        function actualizarBannerSaltadas(){
+            if(!modoRepasoSaltadas) return;
+            const restantes=preguntasSaltadas.length;
+            const banner=document.getElementById('banner-saltadas');
+            if(restantes>0){
+                banner.textContent=`🔄 Ronda de repaso: ${restantes} pregunta${restantes!==1?'s':''}  pendiente${restantes!==1?'s':''} por contestar`;
+            } else {
+                banner.textContent='✅ Has completado todas las preguntas saltadas';
+            }
+        }
+
         // ─── DEJAR EN BLANCO ─────────────────────────────────────────────
         function dejarEnBlanco(){
             document.querySelectorAll('.btn-opcion').forEach(b=>b.disabled=true);
             document.getElementById('btn-blanco').disabled=true;
+            document.getElementById('btn-saltar').disabled=true;
             sesionBlancos++;
             rachaActual=0;
             preguntasRespondidas.add(preguntaEnCurso.id);
@@ -1939,6 +2076,7 @@
             const bots=document.querySelectorAll('.btn-opcion');
             bots.forEach(b=>b.disabled=true);
             if(document.getElementById('btn-blanco')) document.getElementById('btn-blanco').disabled=true;
+            document.getElementById('btn-saltar').disabled=true;
             const ok=(seleccion===preguntaEnCurso.correctaFisica);
             const id=preguntaEnCurso.id;
             const ahora=Date.now();
@@ -1992,8 +2130,36 @@
         }
 
         function siguientePregunta(){
-            if(indiceActual<preguntasActivas.length-1){indiceActual++;cargarPregunta();}
-            else{if(timerInterval)clearInterval(timerInterval);mostrarResultados();}
+            if(modoRepasoSaltadas){
+                // Estamos en ronda de repaso de saltadas
+                if(preguntasSaltadas.length>0){
+                    indiceActual=preguntasSaltadas.shift();
+                    actualizarBannerSaltadas();
+                    cargarPregunta();
+                } else {
+                    // No quedan saltadas → terminar
+                    if(timerInterval)clearInterval(timerInterval);
+                    mostrarResultados();
+                }
+            } else {
+                // Flujo normal: siguiente en orden o disparar ronda saltadas
+                let siguiente=-1;
+                const total=preguntasActivas.length;
+                for(let i=indiceActual+1;i<total;i++){
+                    const yaRespondida=sesionResultados.some(r=>r.id===preguntasActivas[i].id);
+                    const esSaltada=preguntasSaltadas.includes(i);
+                    if(!yaRespondida&&!esSaltada){siguiente=i;break;}
+                }
+                if(siguiente!==-1){
+                    indiceActual=siguiente;
+                    cargarPregunta();
+                } else if(preguntasSaltadas.length>0){
+                    iniciarRepasoSaltadas();
+                } else {
+                    if(timerInterval)clearInterval(timerInterval);
+                    mostrarResultados();
+                }
+            }
         }
 
         // ─── SALIR DEL TEST ──────────────────────────────────────────────
@@ -2011,6 +2177,15 @@
 
         // ─── RESULTADOS ──────────────────────────────────────────────────
         function mostrarResultados(){
+            // Registrar como blanco cualquier pregunta saltada que no se llegó a contestar
+            preguntasSaltadas.forEach(idx=>{
+                const p=preguntasActivas[idx];
+                if(p && !sesionResultados.some(r=>r.id===p.id)){
+                    sesionBlancos++;
+                    sesionResultados.push({id:p.id,asignatura:p.asignatura,tema:p.tema,correcto:null,marcada:marcadasGuardadas.includes(p.id),respuestaFisica:null});
+                }
+            });
+            preguntasSaltadas=[];
             const total=sesionAciertos+sesionFallos+sesionBlancos;
             const resp=sesionAciertos+sesionFallos;
             const pct=resp>0?Math.round((sesionAciertos/resp)*100):0;
@@ -2162,20 +2337,33 @@
             }
         })();
 
+        // ─── AÑADIR ASIGNATURA CUSTOM AL GRID DE BOTONES ─────────────────
+        function añadirBtnAsigCustom(asig){
+            const grid=document.getElementById('asig-btns-grid');
+            if(!grid) return;
+            const yaExiste=[...grid.querySelectorAll('.asig-btn')].some(b=>norm(b.dataset.val)===norm(asig));
+            if(yaExiste) return;
+            const btn=document.createElement('button');
+            btn.className='asig-btn';
+            btn.dataset.val=asig;
+            btn.onclick=function(){toggleAsig(this);};
+            // Texto abreviado: primeras dos palabras o el nombre completo si es corto
+            btn.textContent = asig.length<=14 ? asig : asig.split(' ').slice(0,2).join(' ');
+            btn.title = asig;
+            grid.appendChild(btn);
+        }
+
         document.addEventListener('DOMContentLoaded',()=>{
-            inicializarSelectorAsig();
-            // Añadir asignaturas custom al selector
-            const selFiltro=document.getElementById('filtro-asignatura');
+            // Añadir asignaturas custom al grid de botones ANTES de inicializar selector
             const asigCustom=[...new Set(preguntasPersonalizadas.map(p=>p.asignatura))];
-            asigCustom.forEach(a=>{
-                const yaExiste=[...selFiltro.options].some(o=>norm(o.value)===norm(a));
-                if(!yaExiste){const o=document.createElement('option');o.value=a;o.textContent=a;selFiltro.appendChild(o);}
-            });
+            asigCustom.forEach(a=>añadirBtnAsigCustom(a));
+
+            inicializarSelectorAsig();
+
             // Restaurar últimos filtros usados
             const lf=JSON.parse(localStorage.getItem('pir_lastfilters')||'null');
             if(lf){
                 try{
-                    [...selFiltro.options].forEach(o=>{ o.selected=lf.asigs&&lf.asigs.includes(o.value); });
                     const selC=document.getElementById('filtro-cantidad');
                     if(lf.cantidad) selC.value=lf.cantidad;
                     const selM=document.getElementById('filtro-modo');
