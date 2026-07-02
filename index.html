@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Preparación PIR</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         :root {
             --bg:        #f0f4ff;
@@ -289,6 +290,7 @@
         .toast.visible { transform:translateX(-50%) translateY(0); opacity:1; }
         .toast.ok    { border-left:3px solid #34d399; }
         .toast.error { border-left:3px solid #f87171; }
+        .toast.info  { border-left:3px solid #818cf8; }
 
         /* ── Animaciones ── */
         @keyframes fadeSlide { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
@@ -481,6 +483,7 @@
             <div class="tab-panel" id="tab-añadir">
                 <div class="tabs-config" style="margin-bottom:14px">
                     <button class="tab-btn activo" id="subtab-btn-nueva" onclick="cambiarSubTab('subtab-nueva', this)">✏️ Nueva pregunta</button>
+                    <button class="tab-btn" id="subtab-btn-pdf" onclick="cambiarSubTab('subtab-pdf', this)">📄 Importar PDF</button>
                     <button class="tab-btn" id="subtab-btn-mias" onclick="cambiarSubTab('subtab-mias', this)">📂 Mis preguntas</button>
                     <button class="tab-btn" id="subtab-btn-banco" onclick="cambiarSubTab('subtab-banco', this)">🗂 Banco completo</button>
                 </div>
@@ -534,6 +537,56 @@
                     </div>
                     <button class="btn-principal" id="btn-guardar-anki" onclick="guardarPreguntaAnki()" style="background:#10b981">💾 Guardar Pregunta</button>
                 </div>
+
+                <!-- ═══════════ NUEVO: IMPORTAR DESDE PDF ═══════════ -->
+                <div id="subtab-pdf" style="display:none">
+                    <div class="form-grupo" style="margin-bottom:14px">
+                        <h4 style="margin-top:0">📄 Importar simulacro desde PDF</h4>
+                        <p style="font-size:.85em;color:var(--text-muted);margin:0 0 12px;line-height:1.5">
+                            Sube el PDF de un simulacro comentado (Persever, APIR...). Se extraen las preguntas automáticamente,
+                            se clasifican por tema, y podrás revisar las dudosas antes de añadirlas al banco.
+                        </p>
+                        <input type="file" id="pdf-file-input" accept=".pdf" style="display:none" onchange="procesarPDFSubido(event)">
+                        <div id="pdf-drop-zone" onclick="document.getElementById('pdf-file-input').click()"
+                             style="border:2px dashed var(--border-color,#cbd5e1);border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;transition:all .2s">
+                            <div style="font-size:2em;margin-bottom:6px">📂</div>
+                            <p style="margin:0;font-size:.88em;color:var(--text-muted)"><strong>Haz clic</strong> para seleccionar el PDF</p>
+                        </div>
+                    </div>
+
+                    <!-- Progreso de extracción -->
+                    <div id="pdf-progreso" style="display:none">
+                        <div style="font-size:.85em;font-weight:700;margin-bottom:6px;color:var(--primary)" id="pdf-progreso-texto">Procesando...</div>
+                        <div class="barra-progreso-pista"><div class="barra-progreso-fill" id="pdf-progreso-fill" style="width:0%"></div></div>
+                    </div>
+
+                    <!-- Resumen tras procesar -->
+                    <div id="pdf-resumen" style="display:none">
+                        <div class="stats-grid" style="margin-top:14px">
+                            <div class="stat-card ok"><div class="sc-num" id="pdf-stat-total">0</div><div class="sc-lbl">Preguntas extraídas</div></div>
+                            <div class="stat-card ok"><div class="sc-num" id="pdf-stat-confianza">0</div><div class="sc-lbl">Clasificación segura</div></div>
+                            <div class="stat-card ko"><div class="sc-num" id="pdf-stat-revisar">0</div><div class="sc-lbl">A revisar</div></div>
+                            <div class="stat-card"><div class="sc-num" id="pdf-stat-error">0</div><div class="sc-lbl">No extraídas</div></div>
+                        </div>
+
+                        <div id="pdf-alerta-revisar" style="display:none;margin-bottom:14px" class="panel-fallos-config">
+                            <h3 style="margin:0 0 8px">⚠️ Preguntas para revisar</h3>
+                            <p style="font-size:.82em;margin:0 0 10px;color:#92400e">
+                                Estas preguntas tienen clasificación dudosa o texto incompleto. Revísalas antes de importar — puedes editarlas o descartarlas.
+                            </p>
+                            <button class="btn-secundario" style="color:#c2410c;border-color:#c2410c;margin-top:0" onclick="mostrarRevisionPDF()">👀 Ver y revisar (<span id="pdf-count-revisar">0</span>)</button>
+                        </div>
+
+                        <button class="btn-principal" id="btn-importar-pdf" onclick="confirmarImportarPDF()" style="background:#10b981">
+                            ✅ Importar todas al banco
+                        </button>
+                        <button class="btn-secundario" onclick="cancelarImportPDF()">✕ Descartar y empezar de nuevo</button>
+                    </div>
+
+                    <!-- Lista de revisión de preguntas dudosas -->
+                    <div id="pdf-lista-revision" style="display:none;margin-top:14px"></div>
+                </div>
+                <!-- ═══════════ FIN IMPORTAR PDF ═══════════ -->
 
                 <div id="subtab-mias" style="display:none">
                     <div id="lista-custom-preguntas"></div>
@@ -1870,6 +1923,497 @@
 
 
         // ─── IMPORTAR JSON ───────────────────────────────────────────────
+        // ════════════════════════════════════════════════════════════════
+        // IMPORTADOR DE PDF — extracción + clasificación con marca de confianza
+        // ════════════════════════════════════════════════════════════════
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        // Taxonomía CEDE 8ª edición completa
+        const TAXONOMIA_PDF = {
+            'Psicología Clínica': ['Modelos en psicopatología','Sistemas clasificatorios en psicopatología','Patología de la conciencia','Psicopatología de la atención y orientación','Psicopatología de la sensopercepción','Psicopatología de la memoria','Psicopatología del pensamiento','Psicopatología del lenguaje','Psicopatología de la afectividad','Psicopatología de la conducta motora','Trastornos del espectro de la esquizofrenia y otros trastornos psicóticos','Trastornos depresivos','Trastornos bipolares y relacionados','Trastornos de ansiedad','Trastorno obsesivo-compulsivo y relacionados','Trastornos relacionados con traumas y factores de estrés','Trastornos disociativos','Trastornos de síntomas somáticos y relacionados','Trastornos de la conducta alimentaria y de la ingestión de alimentos','Trastornos del sueño-vigilia','Disfunciones sexuales','Disforia de género','Trastornos destructivos, del control de los impulsos y de la conducta','Trastornos adictivos con sustancia','Trastornos neurocognitivos','Trastornos de la personalidad','Trastornos parafílicos'],
+            'Tratamientos Adultos': ['Técnicas psicológicas generales','Componentes y eficacia de la psicoterapia','Tratamiento de las adicciones','Tratamiento de la psicosis y esquizofrenia','Tratamiento de la depresión y trastornos del ánimo','Tratamiento de los trastornos de ansiedad','Tratamiento del TOC y relacionados','Tratamiento del trauma y TEPT','Tratamiento de los trastornos somáticos','Tratamiento de los trastornos neurocognitivos','Tratamiento de los trastornos disociativos','Tratamiento de los trastornos alimentarios','Tratamiento de las disfunciones sexuales','Tratamiento de los trastornos destructivos','Tratamiento de los trastornos de personalidad','Tratamiento de los trastornos del sueño','Tratamiento del TEA','Tratamiento de los trastornos de la comunicación'],
+            'Psicoterapias': ['Componentes y eficacia de la psicoterapia','Historia de las psicoterapias','Psicoanálisis I: Freud','Psicoanálisis y terapias psicodinámicas','Terapia de grupo y psicodrama','Terapias de familia y modelos sistémicos','Terapias humanistas y existenciales','Técnicas psicológicas generales','Terapia Cognitivo-Conductual','Terapias de tercera generación'],
+            'Psicobiología': ['Nivel celular: la neurona','Aproximación a la genética','Acción de los fármacos en el sistema nervioso','Desarrollo del sistema nervioso','Estructura del sistema nervioso','SNC I: estructuras subcorticales','SNC II: la corteza cerebral','Sistema nervioso periférico','Métodos de investigación y diagnóstico en Neurología','Neuroendocrinología: el sistema endocrino','Neurobiología del sexo','Sistemas perceptivos','Sistema motor','Funciones cognitivas superiores','Ritmos biológicos y sueño','Emoción'],
+            'Evaluación Psicológica': ['Fundamentos de la evaluación psicológica','Clasificación de las técnicas de evaluación psicológica','Técnicas de observación','Los autoinformes','La entrevista','Técnicas objetivas','Técnicas subjetivas','Técnicas proyectivas','Tests de inteligencia y aptitudes','Evaluación neuropsicológica','Tests de personalidad','Evaluación de la ansiedad','Evaluación infantil','Evaluación de adicciones'],
+            'Psicología de la Personalidad y Diferencial': ['Introducción a la psicología de la personalidad','Teorías psicoanalíticas de la personalidad','Teorías humanistas y existenciales de la personalidad','Teorías cognitivas de la personalidad','Teorías biológicas de la personalidad','Modelos factoriales I: Allport','Modelos factoriales II: Cattell','Modelos factoriales III: Eysenck','Otros modelos factoriales','Teorías socio-cognitivas','Modelos interaccionistas','Otros constructos de la personalidad','La identidad personal','Introducción a la psicología diferencial','Determinantes de la conducta: genética vs. ambiente','Estrategias de investigación en Psicología Diferencial','Diferencias interindividuales en inteligencia','Diferencias interindividuales en creatividad y personalidad','Diferencias intergrupales I: edad y sexo','Diferencias intergrupales II: raza, clase social y bilingüismo'],
+            'Psicología Básica': ['Introducción a la psicología','Sensación y percepción','Memoria','Percepción','Aprendizaje y condicionamiento','Pensamiento y lenguaje','Motivación y emoción','Cognición social','Conducta verbal','Atención'],
+            'Psicología Social': ['Modelos teóricos sobre la psicología social','Cognición social y procesos de atribución','Las actitudes','Procesos de interacción social','Métodos de investigación en psicología social','Introducción al concepto de grupo','Estructura y rendimiento del grupo','Procesos de grupo','Relaciones intergrupales','Modelos teóricos sobre las organizaciones','Influencia de la organización en el individuo','Los grupos en la organización','Los procesos en la organización'],
+            'Psicología Evolutiva': ['Introducción a la psicología del desarrollo','Perspectivas teóricas en psicología del desarrollo','Primera infancia (0-2 años)','Desarrollo cognitivo en la segunda infancia','Las manifestaciones de la función simbólica','El desarrollo social y moral','La adolescencia','La edad adulta y la vejez','Definición y modelos de la psicología de la educación','Proceso de enseñanza y aprendizaje'],
+            'Psicología Experimental': ['Estadística','Método científico y experimental','Psicometría'],
+            'Tratamientos Infantiles': ['Introducción a la psicología clínica infantil','Trastorno del Espectro Autista','Discapacidad intelectual','TDAH','Trastornos de la comunicación','Trastornos del aprendizaje','Otros trastornos del neurodesarrollo','Trastornos de ansiedad infantojuvenil','TOC infantojuvenil','Trastornos relacionados con trauma infantojuvenil','Trastornos depresivos y bipolares infantojuvenil','Trastornos de conducta infantojuvenil','Trastornos de excreción infantojuvenil','Trastornos alimentarios infantojuvenil','Trastornos psicóticos infantojuvenil','Trastornos del sueño infantojuvenil','Otros problemas infantojuveniles'],
+        };
+
+        // Reglas de clasificación por palabras clave, con nivel de confianza.
+        // Cada regla: [regex de coincidencia, asignatura, tema, peso de confianza]
+        const REGLAS_PDF = [
+            // ── Tratamientos Infantiles (prioridad alta: si aparece, casi siempre es correcto) ──
+            [/discapacidad intelectual|retraso mental/i, 'Tratamientos Infantiles', 'Discapacidad intelectual', 3],
+            [/espectro autista|\btea\b|asperger/i, 'Tratamientos Infantiles', 'Trastorno del Espectro Autista', 3],
+            [/\btdah\b|déficit de atención.*hiperactividad|hiperactividad/i, 'Tratamientos Infantiles', 'TDAH', 3],
+            [/trastorno (específico )?del lenguaje|disfasia|trastorno de la comunicación social/i, 'Tratamientos Infantiles', 'Trastornos de la comunicación', 3],
+            [/dislexia|discalculia|trastorno (específico )?del aprendizaje/i, 'Tratamientos Infantiles', 'Trastornos del aprendizaje', 3],
+            [/enuresis|encopresis/i, 'Tratamientos Infantiles', 'Trastornos de excreción infantojuvenil', 2],
+
+            // ── Trastornos específicos (Psicología Clínica) ──
+            [/esquizofreni|trastorno esquizoafectivo|psicosis|psicótic|alucinaci|delirio (?!ante)/i, 'Psicología Clínica', 'Trastornos del espectro de la esquizofrenia y otros trastornos psicóticos', 2],
+            [/trastorno depresivo|distimia|depresión mayor|episodio depresivo/i, 'Psicología Clínica', 'Trastornos depresivos', 2],
+            [/trastorno bipolar|manía|maniaco|hipomanía/i, 'Psicología Clínica', 'Trastornos bipolares y relacionados', 2],
+            [/trastorno obsesivo.compulsivo|\btoc\b|tricotilomanía|dismorfia corporal/i, 'Psicología Clínica', 'Trastorno obsesivo-compulsivo y relacionados', 2],
+            [/estrés postraumático|\btept\b|trastorno de estrés agudo|trastorno de adaptación/i, 'Psicología Clínica', 'Trastornos relacionados con traumas y factores de estrés', 2],
+            [/trastorno de ansiedad generalizada|\btag\b|fobia|agorafobia|trastorno de pánico/i, 'Psicología Clínica', 'Trastornos de ansiedad', 2],
+            [/trastorno disociativo|despersonalización|desrealización|amnesia disociativa/i, 'Psicología Clínica', 'Trastornos disociativos', 2],
+            [/trastorno de síntomas somáticos|hipocondría|trastorno conversivo/i, 'Psicología Clínica', 'Trastornos de síntomas somáticos y relacionados', 2],
+            [/anorexia|bulimia|trastorno por atracón/i, 'Psicología Clínica', 'Trastornos de la conducta alimentaria y de la ingestión de alimentos', 2],
+            [/insomnio|narcolepsia|apnea del sueño/i, 'Psicología Clínica', 'Trastornos del sueño-vigilia', 2],
+            [/trastorno de la personalidad|personalidad límite|narcisista|antisocial|esquizotípic/i, 'Psicología Clínica', 'Trastornos de la personalidad', 2],
+            [/trastorno por consumo de sustancias|dependencia.*alcohol|adicción/i, 'Psicología Clínica', 'Trastornos adictivos con sustancia', 2],
+            [/demencia|alzheimer|trastorno neurocognitivo/i, 'Psicología Clínica', 'Trastornos neurocognitivos', 2],
+
+            // ── Tratamientos Adultos: técnicas concretas ──
+            [/exposición con prevención de respuesta|tratamiento del toc/i, 'Tratamientos Adultos', 'Tratamiento del TOC y relacionados', 2],
+            [/emdr|exposición prolongada|tratamiento del trauma/i, 'Tratamientos Adultos', 'Tratamiento del trauma y TEPT', 2],
+            [/activación conductual|tratamiento de la depresión/i, 'Tratamientos Adultos', 'Tratamiento de la depresión y trastornos del ánimo', 2],
+            [/entrevista motivacional|tratamiento de las adicciones|prevención de recaídas/i, 'Tratamientos Adultos', 'Tratamiento de las adicciones', 2],
+            [/terapia dialéctico.conductual|\bdbt\b|linehan/i, 'Tratamientos Adultos', 'Tratamiento de los trastornos de personalidad', 2],
+
+            // ── Psicobiología ──
+            [/neurona|sinapsis|potencial de acción|neurotransmisor/i, 'Psicobiología', 'Nivel celular: la neurona', 1],
+            [/corteza (cerebral|prefrontal|motora)|lóbulo (frontal|parietal|temporal|occipital)/i, 'Psicobiología', 'SNC II: la corteza cerebral', 1],
+            [/amígdala|hipocampo|tálamo|hipotálamo|ganglios basales/i, 'Psicobiología', 'SNC I: estructuras subcorticales', 1],
+
+            // ── Evaluación ──
+            [/\bmmpi\b|\bneo.pi\b|\b16pf\b|cuestionario de personalidad/i, 'Evaluación Psicológica', 'Tests de personalidad', 2],
+            [/\bwechsler\b|\bwisc\b|\bwais\b|cociente intelectual/i, 'Evaluación Psicológica', 'Tests de inteligencia y aptitudes', 2],
+            [/rorschach|\btat\b|test proyectivo/i, 'Evaluación Psicológica', 'Técnicas proyectivas', 2],
+
+            // ── Estadística ──
+            [/desviación típica|varianza|correlación de pearson|chi.cuadrado/i, 'Psicología Experimental', 'Estadística', 1],
+        ];
+
+        function clasificarPreguntaPDF(pregunta, opciones) {
+            const texto = (pregunta + ' ' + (opciones||[]).join(' ')).toLowerCase();
+            let mejor = null;
+            for (const [regex, asig, tema, peso] of REGLAS_PDF) {
+                if (regex.test(texto)) {
+                    if (!mejor || peso > mejor.peso) mejor = {asig, tema, peso};
+                }
+            }
+            if (mejor) {
+                return {
+                    asignatura: mejor.asig,
+                    tema: mejor.tema,
+                    confianza: mejor.peso >= 2 ? 'alta' : 'media'
+                };
+            }
+            return { asignatura: 'Sin clasificar', tema: 'Sin clasificar', confianza: 'baja' };
+        }
+
+        // ── Estado del importador ──
+        let pdfPreguntasExtraidas = [];
+        let pdfNombreSimulacro = '';
+
+        async function procesarPDFSubido(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            pdfNombreSimulacro = file.name.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_]/g, '_');
+
+            document.getElementById('pdf-resumen').style.display = 'none';
+            document.getElementById('pdf-lista-revision').style.display = 'none';
+            document.getElementById('pdf-progreso').style.display = 'block';
+            actualizarProgresoPDF(0, 'Leyendo PDF...');
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                let textoCompleto = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    actualizarProgresoPDF(Math.round((i / pdf.numPages) * 50), `Extrayendo página ${i}/${pdf.numPages}...`);
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    const lineas = agruparPorLineas(content.items);
+                    textoCompleto += lineas.join('\n') + '\n\f\n';
+                    await sleepPDF(5);
+                }
+
+                actualizarProgresoPDF(60, 'Detectando preguntas...');
+                const formatoPDF = detectarFormatoPDF(textoCompleto);
+                if (formatoPDF === 'persever') {
+                    toast('📋 Formato Persever detectado. Para máxima precisión (respuesta correcta por color) usa procesar_persever.py desde terminal.', 'info', 7000);
+                }
+                const preguntas = parsearTextoSimulacro(textoCompleto);
+
+                actualizarProgresoPDF(85, 'Clasificando temas...');
+                preguntas.forEach((q, i) => {
+                    // Persever ya nos da la asignatura; APIR la inferimos por keywords
+                    if (q._asignatura) {
+                        q.asignatura = q._asignatura;
+                        q.tema = 'Sin clasificar';
+                        // Sin RC por texto → revisión obligatoria
+                        q.confianza = q._sinRC ? 'baja' : 'media';
+                    } else {
+                        const cls = clasificarPreguntaPDF(q.pregunta, q.opciones);
+                        q.asignatura = cls.asignatura;
+                        q.tema = cls.tema;
+                        q.confianza = cls.confianza;
+                    }
+                    q.id = `${pdfNombreSimulacro}_${String(i+1).padStart(3,'0')}`;
+                    delete q._asignatura; delete q._sinRC; delete q._numPersever;
+                });
+
+                pdfPreguntasExtraidas = preguntas;
+                actualizarProgresoPDF(100, 'Completado');
+                await sleepPDF(300);
+                mostrarResumenPDF();
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('pdf-progreso').style.display = 'none';
+                toast('Error al procesar el PDF: ' + err.message, 'error', 4000);
+            }
+            event.target.value = '';
+        }
+
+        function sleepPDF(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        function actualizarProgresoPDF(pct, texto) {
+            document.getElementById('pdf-progreso-fill').style.width = pct + '%';
+            document.getElementById('pdf-progreso-texto').textContent = texto;
+        }
+
+        // Agrupa los items de texto de PDF.js en líneas según su posición Y
+        function agruparPorLineas(items) {
+            if (items.length === 0) return [];
+            const filas = [];
+            let filaActual = [];
+            let yActual = items[0].transform[5];
+            for (const item of items) {
+                const y = item.transform[5];
+                if (Math.abs(y - yActual) > 3) {
+                    filas.push(filaActual);
+                    filaActual = [];
+                    yActual = y;
+                }
+                filaActual.push(item);
+            }
+            if (filaActual.length) filas.push(filaActual);
+            // Ordenar cada fila por posición X y unir texto, detectando columnas por gran salto en X
+            return filas.map(fila => {
+                fila.sort((a,b) => a.transform[4] - b.transform[4]);
+                let linea = '';
+                let prevEnd = null;
+                for (const it of fila) {
+                    const x = it.transform[4];
+                    if (prevEnd !== null && x - prevEnd > 15) {
+                        // salto grande de columna → tabulación
+                        linea += '\t';
+                    } else if (prevEnd !== null && x - prevEnd > 2) {
+                        linea += ' ';
+                    }
+                    linea += it.str;
+                    prevEnd = x + (it.width || 0);
+                }
+                return linea;
+            });
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // PARSERS DE PDF: APIR y Persever
+        // ══════════════════════════════════════════════════════════════
+
+        // Mapa de asignaturas Persever → taxonomía interna
+        const PERSEVER_ASIG_MAP = {
+            'basica':        'Psicología Básica',
+            'evaluación':    'Evaluación Psicológica',
+            'evolutiva':     'Psicología Evolutiva',
+            'experimental':  'Psicología Experimental',
+            'psicobiología': 'Psicobiología',
+            'psicopatología':'Psicología Clínica',
+            'social':        'Psicología Social',
+            'terapias':      'Tratamientos Adultos',
+            'diferencial y personalidad': 'Psicología de la Personalidad y Diferencial',
+        };
+
+        // ── Detección del formato del PDF ──────────────────────────────
+        // Persever: cada pregunta va precedida de "<N>\n<Asignatura>" sin "Respuesta correcta:"
+        function detectarFormatoPDF(texto) {
+            const nPersever = (texto.match(/\n\s*\d{1,3}\s*\n\s*(Basica|Evaluación|Evolutiva|Experimental|Psicobiología|Psicopatología|Social|Terapias)\s*\n/gi) || []).length;
+            const nAPir = (texto.match(/Respuesta\s+correcta\s*:\s*\d/gi) || []).length;
+            return nPersever > 5 ? 'persever' : 'apir';
+        }
+
+        // ── Helpers comunes ─────────────────────────────────────────────
+        function limpiarTextoOpt(t) {
+            return t.replace(/\s+/g, ' ').replace(/\n/g, ' ').trim();
+        }
+
+        function encontrarInicioOpcionesPDF(bloque) {
+            const reSecuenciaA = /\n\s*1\.\s*\n\s*2\.\s*\n\s*3\.\s*\n\s*4\.\s*\n/;
+            const mA = bloque.match(reSecuenciaA);
+            if (mA) return { pos: mA.index, formato: 'A', matchLen: mA[0].length };
+
+            const candidatos = [...bloque.matchAll(/\n\s*1[\.\)]\s+/g)];
+            for (const c of candidatos) {
+                const antes = bloque.slice(0, c.index).trim();
+                const esInicioEnunciado = /^\d{1,3}\.\s*$/.test(antes) || antes === '';
+                if (esInicioEnunciado) continue;
+                const after = bloque.slice(c.index + c[0].length, c.index + c[0].length + 350);
+                if (/\n\s*2[\.\)]\s+/.test(after)) return { pos: c.index, formato: 'B' };
+            }
+            if (candidatos.length > 0) return { pos: candidatos[0].index, formato: 'B' };
+            return null;
+        }
+
+        function extraerOpcionesPDF(zonaOpts, formato, matchLen) {
+            const opciones = {};
+            if (formato === 'B') {
+                // Cortar en el primer doble salto de línea para evitar arrastrar comentario
+                const corte = zonaOpts.search(/\n\n/);
+                const zona = corte > 0 ? zonaOpts.slice(0, corte) : zonaOpts;
+                const re = /(?:^|\n)\s*([1-4])[\.\)]\s+(.+?)(?=\n\s*[1-4][\.\)]\s+|$)/gs;
+                let m;
+                while ((m = re.exec(zona)) !== null) {
+                    const k = parseInt(m[1]);
+                    const v = limpiarTextoOpt(m[2]);
+                    if (v.length > 1 && !(k in opciones)) opciones[k] = v;
+                }
+            } else if (formato === 'A') {
+                const textosRaw = zonaOpts.slice(matchLen);
+                let lineas = textosRaw.split(/\n\s*\n/).map(s => s.replace(/\s+/g,' ').trim()).filter(s => s);
+                if (lineas.length < 4) lineas = textosRaw.split('\n').map(s => s.trim()).filter(s => s);
+                for (let i = 0; i < 4 && i < lineas.length; i++) opciones[i+1] = lineas[i];
+            }
+            return opciones;
+        }
+
+        // ── Parser APIR ────────────────────────────────────────────────
+        // Usa "Respuesta correcta: N" como ancla.
+        function parsearTextoAPir(texto) {
+            texto = texto.replace(/www\.\S+\.com/gi, '')
+                         .replace(/Simulacro\s+(APIR|PIR)[^\n]*/gi, '')
+                         .replace(/Pág\.\s*\d+/gi, '')
+                         .replace(/PSICOLOGÍA AMIR[^\n]*/g, '')
+                         .replace(/\f/g, '\n');
+
+            const reRC = /Respuesta\s+correcta\s*:?\s*(\d)/gi;
+            const rcMatches = [...texto.matchAll(reRC)];
+            const preguntas = [];
+            let prevEnd = 0;
+
+            for (const rcMatch of rcMatches) {
+                const rc = parseInt(rcMatch[1]);
+                let bloque = texto.slice(prevEnd, rcMatch.index);
+                prevEnd = rcMatch.index + rcMatch[0].length;
+
+                const lineas = bloque.split('\n');
+                let idxInicio = -1;
+                for (let i = 0; i < lineas.length; i++) {
+                    if (/^\s*\d{1,3}\.\s+\S/.test(lineas[i]) || /^\s*\d{1,3}\.\s*$/.test(lineas[i])) {
+                        idxInicio = i; break;
+                    }
+                }
+                if (idxInicio === -1) continue;
+                bloque = lineas.slice(idxInicio).join('\n');
+
+                const info = encontrarInicioOpcionesPDF(bloque);
+                if (!info) continue;
+
+                const enunciado = bloque.slice(0, info.pos)
+                    .replace(/^\s*\d{1,3}\.\s*/, '').replace(/\s+/g, ' ').trim();
+                if (enunciado.length < 10) continue;
+                if (/^(MUY IMPORTANTE|ADVERTENCIA|INSTRUCCIONES)/i.test(enunciado)) continue;
+
+                const opts = extraerOpcionesPDF(bloque.slice(info.pos), info.formato, info.matchLen);
+                if (Object.keys(opts).length < 2) continue;
+
+                preguntas.push({
+                    pregunta: enunciado,
+                    opciones: [1,2,3,4].map(k => opts[k] || ''),
+                    respuesta_correcta: rc - 1,
+                    _asignatura: null,   // se infiere después por keywords
+                });
+            }
+            return preguntas;
+        }
+
+        // ── Parser Persever ────────────────────────────────────────────
+        // Usa "<N>\n<Asignatura>" como delimitador. Respuesta correcta detectada
+        // por texto fallback "Rn correcta / Rn es correcta" (color verde no
+        // disponible en el navegador).
+        function parsearTextoPersever(texto) {
+            texto = texto.replace(/\f/g, '\n')
+                         .replace(/campuspersever\.es[^\n]*/g, '')
+                         .replace(/\d+\s*veces respondida[^\n]*/g, '')
+                         .replace(/[ªº]?\s*Vuelta:[^\n]*/g, '')
+                         .replace(/con un \d+%? de aciertos[^\n]*/g, '')
+                         .replace(/Pregunta fuera de temario[^\n]*/g, '');
+
+            const reCabecera = /\n\s*(\d{1,3})\s*\n\s*(Basica|Evaluación|Evolutiva|Experimental|Psicobiología|Psicopatología|Social|Terapias|Diferencial\s+y\s+Personalidad)\s*\n/gi;
+            const cabeceras = [...texto.matchAll(reCabecera)];
+
+            const preguntas = [];
+            for (let idx = 0; idx < cabeceras.length; idx++) {
+                const cab = cabeceras[idx];
+                const num = parseInt(cab[1]);
+                const asigRaw = cab[2].toLowerCase().replace(/\s+/g, ' ').trim();
+                const asig = PERSEVER_ASIG_MAP[asigRaw] || 'Sin clasificar';
+
+                const bloqueIni = cab.index + cab[0].length;
+                const bloqueFin = idx + 1 < cabeceras.length ? cabeceras[idx+1].index : texto.length;
+                const bloque = texto.slice(bloqueIni, bloqueFin);
+
+                // Localizar inicio de opciones
+                const mOpt1 = bloque.match(/\n\s*1[\.\)]\s+/);
+                if (!mOpt1) continue;
+
+                const enunciado = bloque.slice(0, mOpt1.index)
+                    .replace(/\s+/g, ' ').trim();
+                if (enunciado.length < 10) continue;
+
+                // Extraer opciones (formato B — Persever siempre inline)
+                const zonaOpts = bloque.slice(mOpt1.index);
+                const opts = extraerOpcionesPDF(zonaOpts, 'B', 0);
+                if (Object.keys(opts).length < 2) continue;
+
+                // Detectar respuesta correcta por texto: "R4 correcta", "R2 es correcta", etc.
+                // (color no disponible en navegador)
+                let rc = null;
+                const mRC = bloque.match(/R([1-4])\W{0,12}(?:es\s+)?correct[ao]/i);
+                if (mRC) rc = parseInt(mRC[1]) - 1;
+
+                preguntas.push({
+                    pregunta: enunciado,
+                    opciones: [1,2,3,4].map(k => opts[k] || ''),
+                    respuesta_correcta: rc !== null ? rc : 0,
+                    _asignatura: asig,
+                    _sinRC: rc === null,   // true = no se pudo detectar RC → revisar
+                    _numPersever: num,
+                });
+            }
+            return preguntas;
+        }
+
+        // ── Punto de entrada único ─────────────────────────────────────
+        function parsearTextoSimulacro(texto) {
+            const formato = detectarFormatoPDF(texto);
+            if (formato === 'persever') return parsearTextoPersever(texto);
+            return parsearTextoAPir(texto);
+        }
+
+        function mostrarResumenPDF() {
+            document.getElementById('pdf-progreso').style.display = 'none';
+            document.getElementById('pdf-resumen').style.display = 'block';
+
+            const total = pdfPreguntasExtraidas.length;
+            const alta = pdfPreguntasExtraidas.filter(q => q.confianza === 'alta').length;
+            const revisar = pdfPreguntasExtraidas.filter(q => q.confianza !== 'alta').length;
+
+            document.getElementById('pdf-stat-total').textContent = total;
+            document.getElementById('pdf-stat-confianza').textContent = alta;
+            document.getElementById('pdf-stat-revisar').textContent = revisar;
+            document.getElementById('pdf-stat-error').textContent = '—';
+            document.getElementById('pdf-count-revisar').textContent = revisar;
+
+            document.getElementById('pdf-alerta-revisar').style.display = revisar > 0 ? 'block' : 'none';
+
+            if (total === 0) {
+                toast('No se han podido extraer preguntas de este PDF', 'error', 4000);
+            } else {
+                toast(`✅ ${total} preguntas extraídas`, 'ok', 3000);
+            }
+        }
+
+        function mostrarRevisionPDF() {
+            const lista = document.getElementById('pdf-lista-revision');
+            lista.style.display = 'block';
+            const dudosas = pdfPreguntasExtraidas.filter(q => q.confianza !== 'alta');
+
+            lista.innerHTML = `<h4 style="margin:14px 0 10px">Revisar (${dudosas.length})</h4>` +
+                dudosas.map((q, idx) => {
+                    const realIdx = pdfPreguntasExtraidas.indexOf(q);
+                    const opciones = Object.keys(TAXONOMIA_PDF).map(asig =>
+                        `<optgroup label="${asig}">` +
+                        TAXONOMIA_PDF[asig].map(t => `<option value="${asig}|||${t}" ${q.asignatura===asig && q.tema===t ? 'selected' : ''}>${t}</option>`).join('') +
+                        `</optgroup>`
+                    ).join('');
+                    return `
+                    <div class="custom-q-item" style="flex-direction:column;align-items:stretch">
+                        <div class="custom-q-texto" style="margin-bottom:8px">${q.pregunta}</div>
+                        <div class="custom-q-meta" style="margin-bottom:6px">
+                            Confianza: <strong style="color:${q.confianza==='media'?'#d97706':'#dc2626'}">${q.confianza}</strong>
+                        </div>
+                        <select onchange="actualizarClasifPDF(${realIdx}, this.value)" style="margin:0 0 8px">
+                            <option value="">— Sin clasificar (descartar tema) —</option>
+                            ${opciones}
+                        </select>
+                        <div style="display:flex;gap:6px">
+                            <button class="btn-secundario" style="margin:0;flex:1" onclick="descartarPreguntaPDF(${realIdx})">🗑 Descartar esta pregunta</button>
+                        </div>
+                    </div>`;
+                }).join('');
+        }
+
+        function actualizarClasifPDF(idx, valor) {
+            if (!valor) {
+                pdfPreguntasExtraidas[idx].asignatura = 'Sin clasificar';
+                pdfPreguntasExtraidas[idx].tema = 'Sin clasificar';
+                return;
+            }
+            const [asig, tema] = valor.split('|||');
+            pdfPreguntasExtraidas[idx].asignatura = asig;
+            pdfPreguntasExtraidas[idx].tema = tema;
+            pdfPreguntasExtraidas[idx].confianza = 'alta'; // ya revisada manualmente
+        }
+
+        function descartarPreguntaPDF(idx) {
+            pdfPreguntasExtraidas[idx]._descartada = true;
+            mostrarRevisionPDF();
+            mostrarResumenPDF();
+        }
+
+        function confirmarImportarPDF() {
+            const validas = pdfPreguntasExtraidas.filter(q => !q._descartada);
+            if (validas.length === 0) {
+                toast('No hay preguntas para importar', 'error', 3000);
+                return;
+            }
+
+            const existing = new Set(bancoPreguntasGlobal.map(q => q.id));
+            const nuevas = validas.filter(q => !existing.has(q.id)).map(q => ({
+                id: q.id,
+                asignatura: q.asignatura,
+                tema: q.tema,
+                pregunta: q.pregunta,
+                opciones: q.opciones,
+                respuesta_correcta: q.respuesta_correcta,
+                explicacion: q.explicacion || '',
+                fuente: pdfNombreSimulacro,
+            }));
+
+            preguntasPersonalizadas.push(...nuevas);
+            bancoPreguntasGlobal.push(...nuevas);
+            localStorage.setItem('pir_preguntas_custom', JSON.stringify(preguntasPersonalizadas));
+
+            actualizarDesplegableTemas();
+            renderMisPreguntas();
+
+            toast(`✅ ${nuevas.length} preguntas importadas al banco`, 'ok', 4000);
+            cancelarImportPDF();
+        }
+
+        function cancelarImportPDF() {
+            pdfPreguntasExtraidas = [];
+            pdfNombreSimulacro = '';
+            document.getElementById('pdf-resumen').style.display = 'none';
+            document.getElementById('pdf-lista-revision').style.display = 'none';
+            document.getElementById('pdf-progreso').style.display = 'none';
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // FIN IMPORTADOR DE PDF
+        // ════════════════════════════════════════════════════════════════
+
         function importarJSON(event){
             const file=event.target.files[0];
             if(!file) return;
@@ -2357,8 +2901,16 @@
         }
 
         document.addEventListener('DOMContentLoaded',()=>{
-            // Añadir asignaturas custom al grid de botones ANTES de inicializar selector
-            const asigCustom=[...new Set(preguntasPersonalizadas.map(p=>p.asignatura))];
+            // 1. Extraemos las asignaturas personalizadas que ya tenías
+            const asigCustom = [...new Set(preguntasPersonalizadas.map(p=>p.asignatura))];
+            
+            // 2. Buscamos si existe "fallos ankis" en el banco principal y la añadimos a la lista
+            const tieneFallos = bancoPreguntasOriginal.some(p => p.asignatura === "fallos ankis");
+            if (tieneFallos && !asigCustom.includes("fallos ankis")) {
+                asigCustom.push("fallos ankis");
+            }
+
+            // 3. Generamos los botones
             asigCustom.forEach(a=>añadirBtnAsigCustom(a));
 
             inicializarSelectorAsig();
